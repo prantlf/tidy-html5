@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+  <meta name="generator" content=
+  "HTML Tidy for HTML5 (experimental) https://github.com/w3c/tidy-html5/tree/c63cc39">
+
+  <script src="bin/tidy.js">
+</script>
+
+<style>
+textarea{width:100%; height:250px}
+</style>
+  <title>HTML Tidy in javascript</title>
+</head>
+
+<body>
+  <textarea id="badhtml">
+I &lt;3 bad HTML
+</textarea> 
+  <textarea id="conf">
+{
+  "indent": "auto",
+  "indent": "auto",
+  "indent-spaces": "2",
+  "wrap": "72",
+  "markup": true,
+  "output-xml": false,
+  "input-xml": false,
+  "show-warnings": true,
+  "numeric-entities": true,
+  "quote-marks": true,
+  "quote-nbsp": false,
+  "show-body-only": false,
+  "quote-ampersand": false,
+  "break-before-br": false,
+  "uppercase-tags": false,
+  "uppercase-attributes": false,
+  "char-encoding": "latin1",
+  "new-inline-tags": "cfif, cfelse, math, mroot",
+  "new-blocklevel-tags": "cfoutput, cfquery",
+  "new-empty-tags": "cfelse"
+}
+</textarea> 
+<script>
+function run(){
+  document.getElementById('result').value = tidy_html5(
+     document.getElementById('badhtml').value,
+     JSON.parse(document.getElementById('conf').value)
+      );
+  }
+</script>
+<button onclick="run()">run</button>
+
+<textarea id="result">
+</textarea>
+</body>
+</html>
