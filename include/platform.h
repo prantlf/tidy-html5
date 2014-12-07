@@ -6,12 +6,6 @@
   (c) 1998-2008 (W3C) MIT, ERCIM, Keio University
   See tidy.h for the copyright notice.
 
-  CVS Info :
-
-    $Author: arnaud02 $ 
-    $Date: 2008/03/17 12:57:01 $ 
-    $Revision: 1.66 $ 
-
 */
 
 #ifdef __cplusplus
@@ -230,6 +224,10 @@ extern "C" {
 
 #endif
 
+#ifdef EMSCRIPTEN
+#define PRESERVE_FILE_TIMES 0
+#include <sys/types.h>
+#endif
 /* Convenience defines for Solaris platforms */
  
 #if defined(sun)

@@ -10,6 +10,7 @@
 #     Dave Raggett <dsr@w3.org>
 #     Terry Teague <terry_teague@users.sourceforge.net>
 #     Pradeep Padala<ppadala@users.sourceforge.net>
+#     Ophir Lojkine<ophir.lojkine@eleves.ec-nantes.fr>
 #
 #  The contributing author(s) would like to thank all those who
 #  helped with testing, bug fixes, and patience.  This wouldn't
@@ -84,13 +85,15 @@ DOCDIR = ${TOPDIR}/htmldoc
 # CFLAGS etc..
 # For optimised builds, flags such as "-O2" should be added and -D_DEBUG=1
 # disabled.
-CC= gcc
-CFLAGS= -g -pedantic -Wall -I $(INCDIR)
+CC= emcc
+CFLAGS= -Oz -pedantic -Wall -I $(INCDIR)
 # flags only supported with gcc 3.x
 CFLAGS += -Wunused-parameter
 
+# Flags used for the generation of the js file
+EMFLAGS= -O3  --memory-init-file 0 --pre-js wrapper.js
+
 OTHERCFLAGS=
-OTHERCFLAGS+= -D_DEBUG=1 -D_MSC_VER=1400
 # OTHERCFLAGS+= -fvisibility=hidden -DTIDY_EXPORT='__attribute__((visibility("default")))'
 ifdef SUPPORT_UTF16_ENCODINGS
 CFLAGS += -DSUPPORT_UTF16_ENCODINGS=$(SUPPORT_UTF16_ENCODINGS)
@@ -124,9 +127,7 @@ AR=ar -r
 
 XSLTPROC = xsltproc
 
-EXES = $(BINDIR)/$(PROJECT) $(BINDIR)/tab2space
-
-DOCS = $(DOCDIR)/quickref.html $(DOCDIR)/tidy.1
+EXES = $(BINDIR)/$(PROJECT).js 
 
 CONFIGXML = $(DOCDIR)/tidy-config.xml
 HELPXML = $(DOCDIR)/tidy-help.xml
@@ -167,8 +168,6 @@ LIBHFILES= \
 
 all:    $(LIBRARY) $(EXES)
 
-doc:    $(DOCS)
-
 $(LIBRARY): $(OBJFILES)
 	if [ ! -d $(LIBDIR) ]; then mkdir $(LIBDIR); fi
 	$(AR) $@ $(OBJFILES)
@@ -180,9 +179,9 @@ $(OBJDIR)/%$(OBJSUF):	$(SRCDIR)/%.c $(HFILES) $(LIBHFILES) Makefile
 	if [ ! -d $(OBJDIR) ]; then mkdir $(OBJDIR); fi
 	$(CC) $(CFLAGS) $(OTHERCFLAGS) -o $@ -c $<
 
-$(BINDIR)/$(PROJECT):	$(APPDIR)/tidy.c $(HFILES) $(LIBRARY)
+$(BINDIR)/$(PROJECT).js:	$(APPDIR)/tidy.c wrapper.js $(HFILES) $(OBJFILES)
 	if [ ! -d $(BINDIR) ]; then mkdir $(BINDIR); fi
-	$(CC) $(CFLAGS) $(OTHERCFLAGS) -o $@ $(APPDIR)/tidy.c -I$(INCDIR) $(LIBRARY)
+	$(CC) $(CFLAGS) $(OTHERCFLAGS) $(EMFLAGS) -o $@ $(APPDIR)/tidy.c -I$(INCDIR) $(LIBRARY)
 
 $(BINDIR)/tab2space: $(APPDIR)/tab2space.c
 	if [ ! -d $(BINDIR) ]; then mkdir $(BINDIR); fi
@@ -211,21 +210,3 @@ clean:
 	if [ "$(OBJDIR)" != "$(TOPDIR)" -a -d $(OBJDIR) ]; then rmdir $(OBJDIR); fi
 	if [ "$(LIBDIR)" != "$(TOPDIR)" -a -d $(LIBDIR) ]; then rmdir $(LIBDIR); fi
 	if [ "$(BINDIR)" != "$(TOPDIR)" -a -d $(BINDIR) ]; then rmdir $(BINDIR); fi
-
-installhdrs: $(HFILES)
-	if [ ! -d "$(incinst)" ]; then mkdir -p "$(incinst)"; fi
-	cp -f $(HFILES) "$(incinst)/"
-
-installib: $(LIBRARY)
-	if [ ! -d "$(libinst)" ]; then mkdir -p "$(libinst)"; fi
-	cp -f $(LIBRARY) "$(libinst)/"
-
-installexes: $(EXES)
-	if [ ! -d "$(bininst)" ]; then mkdir -p "$(bininst)"; fi
-	cp -f $(EXES) "$(bininst)/"
-
-installmanpage: $(DOCDIR)/tidy.1
-	if [ ! -d "$(maninst)/man1" ]; then mkdir -p "$(maninst)/man1"; fi;
-	cp -f $(DOCDIR)/tidy.1 "$(maninst)/man1/tidy.1";
-
-install: installhdrs installib installexes installmanpage
