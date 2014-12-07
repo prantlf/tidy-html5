@@ -91,7 +91,7 @@ CFLAGS= -Oz -pedantic -Wall -I $(INCDIR)
 CFLAGS += -Wunused-parameter
 
 # Flags used for the generation of the js file
-EMFLAGS= -O3  --memory-init-file 0 --pre-js wrapper.js
+EMFLAGS= -O3  --memory-init-file 0 --pre-js wrapper.js --post-js post.js
 
 OTHERCFLAGS=
 # OTHERCFLAGS+= -fvisibility=hidden -DTIDY_EXPORT='__attribute__((visibility("default")))'
@@ -179,7 +179,7 @@ $(OBJDIR)/%$(OBJSUF):	$(SRCDIR)/%.c $(HFILES) $(LIBHFILES) Makefile
 	if [ ! -d $(OBJDIR) ]; then mkdir $(OBJDIR); fi
 	$(CC) $(CFLAGS) $(OTHERCFLAGS) -o $@ -c $<
 
-$(BINDIR)/$(PROJECT).js:	$(APPDIR)/tidy.c wrapper.js $(HFILES) $(OBJFILES)
+$(BINDIR)/$(PROJECT).js:	$(APPDIR)/tidy.c wrapper.js post.js $(HFILES) $(OBJFILES)
 	if [ ! -d $(BINDIR) ]; then mkdir $(BINDIR); fi
 	$(CC) $(CFLAGS) $(OTHERCFLAGS) $(EMFLAGS) -o $@ $(APPDIR)/tidy.c -I$(INCDIR) $(LIBRARY)
 
