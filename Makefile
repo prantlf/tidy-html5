@@ -11,6 +11,9 @@ bin/tidy:
 	$(MAKE) -C build/gmake
 	$(MAKE) -C build/gmake doc
 
+bin/tidy.js:
+	$(MAKE) -C build/emscripten
+
 .FORCE:
 # dummy target to force other targets to always get remade
 
