@@ -1,4 +1,5 @@
 /build/gmake/obj/
+/build/emscripten/obj/
 /bin/
 /build/msvc2010/Obj/
 /build/msvc2010/Debugtidydll/
