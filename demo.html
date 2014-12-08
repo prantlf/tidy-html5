@@ -1,58 +1,98 @@
 <!DOCTYPE html>
-
 <html>
-<head>
-  <meta name="generator" content=
-  "HTML Tidy for HTML5 (experimental) https://github.com/w3c/tidy-html5/tree/c63cc39">
+  <head>
+    <meta name="generator"
+          content=
+          "HTML Tidy for HTML5 (experimental) for Linux https://github.com/w3c/tidy-html5/tree/c63cc39">
+    <!-- The code compiled from c to js is in tidy.js -->
 
-  <script src="tidy.js">
+    <script src="tidy.js">
 </script>
+    <link rel="stylesheet"
+          href=
+          "https://cdnjs.cloudflare.com/ajax/libs/codemirror/4.8.0/codemirror.css">
+    <style>
+//textarea{width:100%; }
+    </style>
+    <title>
+      HTML Tidy in javascript
+    </title>
+  </head>
+  <body>
+    <p>
+      <label for="badhtml">HTML code to fix</label> 
+      <textarea id="badhtml"
+         class="editor"
+         data-editor-lang="xml">
+&lt;title&gt;I &lt;3 bad HTML&lt;/title&gt;
+  
+  
+  &lt;h1&gt;Justification&lt;/h2&gt;
+  &lt;ul&gt;
+    &lt;li&gt;It's easy to write
+    &lt;li&gt;I can convert it to &lt;em&gt;good&lt;em&gt; HTML
+  &lt;/ul&gt;
 
-<style>
-textarea{width:100%; height:250px}
-</style>
-  <title>HTML Tidy in javascript</title>
-</head>
+  <p>It can drop &lt;i&gt;&lt;/i&gt; empty elements.
 
-<body>
-  <textarea id="badhtml">
-I &lt;3 bad HTML
-</textarea> 
-  <textarea id="conf">
+  <p><center><font>Are there still people using font tags?</font></center>
+
+  <input autofocus=true value=&quot;I got iterrupt...
+</textarea>
+    </p>
+    <p>
+      <label for="conf">Configuration <small><a href=
+      "http://w3c.github.io/tidy-html5/quickref.html">list of
+      options</a></small></label> 
+      <textarea id="conf"
+         class="editor"
+         data-editor-lang="javascript">
 {
   "indent": "auto",
-  "indent": "auto",
   "indent-spaces": "2",
-  "wrap": "72",
+  "wrap": "80",
   "markup": true,
   "output-xml": false,
-  "input-xml": false,
-  "show-warnings": true,
   "numeric-entities": true,
   "quote-marks": true,
   "quote-nbsp": false,
   "show-body-only": false,
   "quote-ampersand": false,
-  "break-before-br": false,
+  "break-before-br": true,
   "uppercase-tags": false,
   "uppercase-attributes": false,
-  "char-encoding": "latin1",
-  "new-inline-tags": "cfif, cfelse, math, mroot",
-  "new-blocklevel-tags": "cfoutput, cfquery",
-  "new-empty-tags": "cfelse"
+  "drop-font-tags": true,
+  "tidy-mark": false
 }
-</textarea> 
-<script>
-function run(){
-  document.getElementById('result').value = tidy_html5(
-     document.getElementById('badhtml').value,
-     JSON.parse(document.getElementById('conf').value)
-      );
-  }
-</script>
-<button onclick="run()">run</button>
-
-<textarea id="result">
 </textarea>
-</body>
+    </p>
+
+    <script>
+function run(){
+    var html = editors[0].getValue();
+    var json = JSON.parse(editors[1].getValue())
+    var result = tidy_html5(html, json);
+    editors[0].setValue(result);
+}
+    </script> 
+
+    <p>
+      <button onclick="run()">run</button>
+    </p><script src=
+    "https://cdnjs.cloudflare.com/ajax/libs/codemirror/4.8.0/codemirror.js">
+</script> <script src=
+"https://cdnjs.cloudflare.com/ajax/libs/codemirror/4.8.0/mode/javascript/javascript.min.js">
+</script> <script src="http://codemirror.net/mode/xml/xml.js">
+</script> <script>
+var editors = Array.from(document.getElementsByClassName("editor")).map(
+      function(elem) {
+      var editor = CodeMirror.fromTextArea(elem, {
+          mode: elem.dataset.editorLang,
+          lineNumbers: true
+        });
+        return editor;
+      }
+    );
+    </script>
+  </body>
 </html>
