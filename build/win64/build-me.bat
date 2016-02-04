@@ -1,5 +1,5 @@
 @setlocal
-@set TMPPRJ=tidy5
+@set TMPPRJ=tidy
 @echo Build %TMPPRJ% project, in 64-bits
 @set TMPLOG=bldlog-1.txt
 @set BLDDIR=%CD%
@@ -43,6 +43,7 @@
 @set TMPOPTS=%TMPOPTS% -G "Visual Studio 10 Win64"
 @REM set TMPOPTS=%TMPOPTS% -DTIDY_CONFIG_FILE="C:\MDOS\tidy5.cfg"
 @REM set TMPOPTS=%TMPOPTS% -DTIDY_USER_CONFIG_FILE="C:\MDOS\tidy5.cfg"
+@set TMPOPTS=%TMPOPTS% -DBUILD_SHARED_LIB:BOOL=OFF
 
 :RPT
 @if "%~1x" == "x" goto GOTCMD

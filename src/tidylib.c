@@ -355,7 +355,7 @@ ctmbstr TIDY_CALL       tidyOptGetDefault( TidyOption topt )
 {
     const TidyOptionImpl* option = tidyOptionToImpl( topt );
     if ( option && option->type == TidyString )
-        return (ctmbstr) option->dflt;
+        return option->pdflt; /* Issue #306 - fix an old typo hidden by a cast! */
     return NULL;
 }
 ulong TIDY_CALL          tidyOptGetDefaultInt( TidyOption topt )
@@ -516,8 +516,7 @@ ctmbstr TIDY_CALL       tidyOptGetNextDeclTag( TidyDoc tdoc, TidyOptionId optId,
 ctmbstr TIDY_CALL tidyOptGetDoc( TidyDoc ARG_UNUSED(tdoc), TidyOption opt )
 {
     const TidyOptionId optId = tidyOptGetId( opt );
-    const TidyOptionDoc* docDesc = TY_(OptGetDocDesc)( optId );
-    return docDesc ? docDesc->doc : NULL;
+    return tidyLocalizedString(optId);
 }
 
 TidyIterator TIDY_CALL tidyOptGetDocLinksList( TidyDoc ARG_UNUSED(tdoc), TidyOption opt )
@@ -657,12 +656,33 @@ Bool TIDY_CALL        tidySetReportFilter( TidyDoc tdoc, TidyReportFilter filt )
   return no;
 }
 
+/* TidyReportFilter2 functions similar to TidyReportFilter, but provides the
+** built-in English format string and va_list so that LibTidy users can use
+** the format string as a lookup key for providing their own error 
+** localizations.
+*/
 Bool TIDY_CALL        tidySetReportFilter2( TidyDoc tdoc, TidyReportFilter2 filt )
 {
   TidyDocImpl* impl = tidyDocToImpl( tdoc );
   if ( impl )
   {
     impl->mssgFilt2 = filt;
+    return yes;
+  }
+  return no;
+}
+
+/* TidyReportFilter3 functions similar to TidyReportFilter, but provides the
+ * string version of the internal enum name so that LibTidy users can use
+** the string as a lookup key for providing their own error localizations.
+** See the string definitions in language.h
+*/
+Bool TIDY_CALL        tidySetReportFilter3( TidyDoc tdoc, TidyReportFilter3 filt )
+{
+  TidyDocImpl* impl = tidyDocToImpl( tdoc );
+  if ( impl )
+  {
+    impl->mssgFilt3 = filt;
     return yes;
   }
   return no;
@@ -750,6 +770,19 @@ int TIDY_CALL    tidySetErrorSink( TidyDoc tdoc, TidyOutputSink* sink )
         return ( impl->errout ? 0 : -ENOMEM );
     }
     return -EINVAL;
+}
+
+/* Use TidyPPProgress to monitor the progress of the pretty printer.
+ */
+Bool TIDY_CALL        tidySetPrettyPrinterCallback(TidyDoc tdoc, TidyPPProgress callback)
+{
+    TidyDocImpl* impl = tidyDocToImpl( tdoc );
+    if ( impl )
+    {
+        impl->progressCallback = callback;
+        return yes;
+    }
+    return no;
 }
 
 
@@ -1185,6 +1218,7 @@ int         TY_(DocParseStream)( TidyDocImpl* doc, StreamIn* in )
     assert( doc->docIn == NULL );
     doc->docIn = in;
 
+    TY_(ResetTags)(doc);    /* reset table to html5 mode */
     TY_(TakeConfigSnapshot)( doc );    /* Save config state */
     TY_(FreeAnchors)( doc );
 
@@ -1414,7 +1448,7 @@ void TY_(CheckHTML5)( TidyDocImpl* doc, Node* node )
         } else
         if ( nodeIsBIG(node) ) {
             /*\
-             * big: CSS equivalent	'font-size:larger'
+             * big: CSS equivalent 'font-size:larger'
              * so could replace the <big> ... </big> with 
              * <span style="font-size: larger"> ... </span>
              * then replace <big> with <span>
@@ -1438,7 +1472,7 @@ void TY_(CheckHTML5)( TidyDocImpl* doc, Node* node )
         } else
         if ( nodeIsCENTER(node) ) {
             /*\
-             * center: CSS equivalent	'text-align:center'
+             * center: CSS equivalent 'text-align:center'
              *  and 'margin-left:auto; margin-right:auto' on descendant blocks
              * Tidy already handles this if 'clean' by SILENTLY generating the <style>
              * and adding a <div class="c1"> around the elements.
@@ -1472,7 +1506,7 @@ void TY_(CheckHTML5)( TidyDocImpl* doc, Node* node )
         } else
         if ( nodeIsSTRIKE(node) ) {
             /*\
-             * strike: CSS equivalent	'text-decoration:line-through'
+             * strike: CSS equivalent 'text-decoration:line-through'
              * maybe should use static void RenameElem( TidyDocImpl* doc, Node* node, TidyTagId tid )
             \*/
             if (clean) {
@@ -1484,7 +1518,7 @@ void TY_(CheckHTML5)( TidyDocImpl* doc, Node* node )
         } else
         if ( nodeIsTT(node) ) {
             /*\
-             * tt: CSS equivalent	'font-family:monospace'
+             * tt: CSS equivalent 'font-family:monospace'
              * Tidy presently does nothing. Tidy5 issues a warning
              * But like the 'clean' <font> replacement this could also be replaced with CSS
              * maybe should use static void RenameElem( TidyDocImpl* doc, Node* node, TidyTagId tid )
@@ -1572,6 +1606,7 @@ const char *dbg_get_element_name( void *vp )
 void dbg_show_node( TidyDocImpl* doc, Node *node, int caller, int indent )
 {
     AttVal* av;
+    Lexer* lexer = doc->lexer;
     ctmbstr call = "";
     ctmbstr name = dbg_get_element_name(node);
     ctmbstr type = dbg_get_lexer_type(node);
@@ -1588,6 +1623,29 @@ void dbg_show_node( TidyDocImpl* doc, Node *node, int caller, int indent )
         SPRTF("%s %s %s %s", type, name, impl, call );
     else
         SPRTF("%s %s %s", name, impl, call );
+    if (lexer && (strcmp("Text",name) == 0)) {
+        uint len = node->end - node->start;
+        uint i;
+        SPRTF(" (%d) '", len);
+        if (len < 40) {
+            /* show it all */
+            for (i = node->start; i < node->end; i++) {
+                SPRTF("%c", lexer->lexbuf[i]);
+            }
+        } else {
+            /* partial display */
+            uint max = 19;
+            for (i = node->start; i < max; i++) {
+                SPRTF("%c", lexer->lexbuf[i]);
+            }
+            SPRTF("...");
+            i = node->end - 19;
+            for (; i < node->end; i++) {
+                SPRTF("%c", lexer->lexbuf[i]);
+            }
+        }
+        SPRTF("'");
+    }
     for (av = node->attributes; av; av = av->next) {
         name = av->attribute;
         if (name) {
@@ -1597,6 +1655,7 @@ void dbg_show_node( TidyDocImpl* doc, Node *node, int caller, int indent )
             }
         }
     }
+
     SPRTF("\n");
 }
 
@@ -1783,7 +1842,13 @@ int         tidyDocSaveStream( TidyDocImpl* doc, StreamOut* out )
     Bool asciiChars   = cfgBool(doc, TidyAsciiChars);
     Bool makeBare     = cfgBool(doc, TidyMakeBare);
     Bool escapeCDATA  = cfgBool(doc, TidyEscapeCdata);
+    Bool ppWithTabs   = cfgBool(doc, TidyPPrintTabs);
     TidyAttrSortStrategy sortAttrStrat = cfg(doc, TidySortAttributes);
+
+    if (ppWithTabs)
+        TY_(PPrintTabs)();
+    else
+        TY_(PPrintSpaces)();
 
     if (escapeCDATA)
         TY_(ConvertCDATANodes)(doc, &doc->root);
@@ -1897,6 +1962,15 @@ TidyNode TIDY_CALL    tidyGetChild( TidyNode tnod )
 {
   Node* nimp = tidyNodeToImpl( tnod );
   return tidyImplToNode( nimp->content );
+}
+
+/* remove a node */
+TidyNode TIDY_CALL    tidyDiscardElement( TidyDoc tdoc, TidyNode tnod )
+{
+  TidyDocImpl* doc = tidyDocToImpl( tdoc );
+  Node* nimp = tidyNodeToImpl( tnod );
+  Node* next = TY_(DiscardElement)( doc, nimp );
+  return tidyImplToNode( next );
 }
 
 /* siblings */
@@ -2108,6 +2182,14 @@ ctmbstr TIDY_CALL       tidyAttrValue( TidyAttr tattr )
   if ( attval )
     aval = attval->value;
   return aval;
+}
+
+void TIDY_CALL           tidyAttrDiscard( TidyDoc tdoc, TidyNode tnod, TidyAttr tattr )
+{
+  TidyDocImpl* impl = tidyDocToImpl( tdoc );
+  Node* nimp = tidyNodeToImpl( tnod );
+  AttVal* attval = tidyAttrToImpl( tattr );
+  TY_(RemoveAttribute)( impl, nimp, attval );
 }
 
 /* Null for pure HTML

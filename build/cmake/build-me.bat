@@ -1,14 +1,16 @@
 @setlocal
 
 @set TMPVER=1
-@set TMPPRJ=tidy5
+@set TMPPRJ=tidy
 @set TMPSRC=..\..
 @set TMPBGN=%TIME%
-@set TMPINS=..\..\..\3rdParty
+@set TMPINS=..\..\..\software
 @set DOTINST=0
 @set TMPLOG=bldlog-1.txt
 
 @set TMPOPTS=-DCMAKE_INSTALL_PREFIX=%TMPINS%
+@set TMPOPTS=%TMPOPTS% -DBUILD_SHARED_LIB=ON
+
 :RPT
 @if "%~1x" == "x" goto GOTCMD
 @set TMPOPTS=%TMPOPTS% %1
@@ -17,6 +19,7 @@
 :GOTCMD
 
 @call chkmsvc %TMPPRJ%
+@call chkbranch master
 
 @echo Build %DATE% %TIME% > %TMPLOG%
 

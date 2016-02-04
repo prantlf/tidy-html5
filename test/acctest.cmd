@@ -5,13 +5,14 @@
 @REM USER VARIABLES
 @REM ##############
 @REM set executable to be used
-@set TIDY=..\build\cmake\Release\tidy5.exe
+@set TIDY=..\build\cmake\Release\tidy.exe
 @REM set INPUT folder
 @set TIDYINPUT=accessTest
 @REM set OUTPUT folder
-@set TIDYOUT=tmp
+@set TIDYOUT=temp-acc
 @REM set input test list file
 @set TIDYIN=accesscases.txt
+@set TIDYLOG=tempacc.txt
 @REM ##############
 
 @if NOT EXIST %TIDY% goto ERR1
@@ -24,12 +25,17 @@
 @pause
 @md %TIDYOUT%
 :RUNTEST
-@echo Running ACCESS TEST suite > ACCERR.TXT
-@echo Executable = %TIDY% >> ACCERR.TXT
-@echo Input Folder = %TIDYINPUT% >> ACCERR.TXT
-@echo Output Folder = %TIDYOUT% >> ACCERR.TXT
+@echo Running ACCESS TEST suite
+@echo Executable = %TIDY%
+@echo Input Folder = %TIDYINPUT%
+@echo Output Folder = %TIDYOUT%
+
+@echo Running ACCESS TEST suite > %TIDYLOG%
+@echo Executable = %TIDY% >> %TIDYLOG%
+@echo Input Folder = %TIDYINPUT% >> %TIDYLOG%
+@echo Output Folder = %TIDYOUT% >> %TIDYLOG%
 @set FAILEDACC=
-@for /F "skip=1 tokens=1,2*" %%i in (%TIDYIN%) do call onetesta.cmd %%i %%j %%k
+@for /F "skip=1 tokens=1,2*" %%i in (%TIDYIN%) do @(call onetesta.cmd %%i %%j %%k)
 @if "%FAILEDACC%." == "." goto SUCCESS
 @echo FAILED [%FAILEDACC%] ...
 @goto END
