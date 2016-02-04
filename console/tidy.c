@@ -9,7 +9,7 @@
  */
 
 #include "tidy.h"
-#include "language.h"
+#include "../src/language.h"
 #include "locale.h"
 #if defined(_WIN32)
 #include <windows.h> /* Force console to UTF8. */
