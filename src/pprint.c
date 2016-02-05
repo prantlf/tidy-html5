@@ -36,6 +36,27 @@ static int  TextStartsWithWhitespace( Lexer *lexer, Node *node, uint start, uint
 static Bool InsideHead( TidyDocImpl* doc, Node *node );
 static Bool ShouldIndent( TidyDocImpl* doc, Node *node );
 
+/*\
+ * Issue #228 20150715 - macros to access --vertical-space tri state configuration parameter
+\*/
+#define TidyClassicVS ((cfgAutoBool( doc, TidyVertSpace ) == TidyYesState) ? yes : no)
+#define TidyAddVS ((cfgAutoBool( doc, TidyVertSpace ) == TidyAutoState) ? no : yes )
+
+/*\
+ * 20150515 - support using tabs instead of spaces - Issue #108
+ * GH: https://github.com/htacg/tidy-html5/issues/108 - Keep indent with tabs #108
+ * SF: https://sourceforge.net/p/tidy/feature-requests/3/ - #3 tabs in place of spaces
+\*/
+static uint indent_char = ' ';
+void TY_(PPrintTabs)(void)
+{
+    indent_char = '\t';
+}
+void TY_(PPrintSpaces)(void)
+{
+    indent_char = ' ';
+}
+
 #if SUPPORT_ASIAN_ENCODINGS
 /* #431953 - start RJ Wraplen adjusted for smooth international ride */
 
@@ -291,6 +312,7 @@ void TY_(InitPrintBuf)( TidyDocImpl* doc )
     InitIndent( &doc->pprint.indent[0] );
     InitIndent( &doc->pprint.indent[1] );
     doc->pprint.allocator = doc->allocator;
+    doc->pprint.line = 0;
 }
 
 void TY_(FreePrintBuf)( TidyDocImpl* doc )
@@ -582,7 +604,7 @@ static void WrapLine( TidyDocImpl* doc )
     {
         uint spaces = GetSpaces( pprint );
         for ( i = 0; i < spaces; ++i )
-            TY_(WriteChar)( ' ', doc->docOut );
+            TY_(WriteChar)( indent_char, doc->docOut ); /* 20150515 - Issue #108 */
     }
 
     for ( i = 0; i < pprint->wraphere; ++i )
@@ -592,6 +614,7 @@ static void WrapLine( TidyDocImpl* doc )
         TY_(WriteChar)( '\\', doc->docOut );
 
     TY_(WriteChar)( '\n', doc->docOut );
+    pprint->line++;
     ResetLineAfterWrap( pprint );
 }
 
@@ -633,7 +656,7 @@ static void WrapAttrVal( TidyDocImpl* doc )
     {
         uint spaces = GetSpaces( pprint );
         for ( i = 0; i < spaces; ++i )
-            TY_(WriteChar)( ' ', doc->docOut );
+            TY_(WriteChar)( indent_char, doc->docOut ); /* 20150515 - Issue #108 */
     }
 
     for ( i = 0; i < pprint->wraphere; ++i )
@@ -645,6 +668,7 @@ static void WrapAttrVal( TidyDocImpl* doc )
         TY_(WriteChar)( ' ', doc->docOut );
 
     TY_(WriteChar)( '\n', doc->docOut );
+    pprint->line++;
     ResetLineAfterWrap( pprint );
 }
 
@@ -660,12 +684,12 @@ static void PFlushLineImpl( TidyDocImpl* doc )
     {
         uint spaces = GetSpaces( pprint );
         for ( i = 0; i < spaces; ++i )
-            TY_(WriteChar)( ' ', doc->docOut );
+            TY_(WriteChar)( indent_char, doc->docOut ); /* 20150515 - Issue #108 */
     }
 
     for ( i = 0; i < pprint->linelen; ++i )
         TY_(WriteChar)( pprint->linebuf[i], doc->docOut );
-    
+
     if ( IsInString(pprint) )
         TY_(WriteChar)( '\\', doc->docOut );
     ResetLine( pprint );
@@ -680,6 +704,7 @@ void TY_(PFlushLine)( TidyDocImpl* doc, uint indent )
         PFlushLineImpl( doc );
 
     TY_(WriteChar)( '\n', doc->docOut );
+    pprint->line++;
     pprint->indent[ 0 ].spaces = indent;
 }
 
@@ -692,6 +717,47 @@ static void PCondFlushLine( TidyDocImpl* doc, uint indent )
          PFlushLineImpl( doc );
 
          TY_(WriteChar)( '\n', doc->docOut );
+         pprint->line++;
+         pprint->indent[ 0 ].spaces = indent;
+    }
+}
+
+/**
+ * Two additional "smart" flush line functions which only
+ * write a newline if `vertical-space no`. See issues #163 and #227.
+ * These need to be used in the right place. In same cases `PFlushLine`
+ * and `PCondFlushLine` should still be used.
+ */
+void TY_(PFlushLineSmart)( TidyDocImpl* doc, uint indent )
+{
+    TidyPrintImpl* pprint = &doc->pprint;
+
+    if ( pprint->linelen > 0 )
+        PFlushLineImpl( doc );
+
+    /* Issue #228 - cfgBool( doc, TidyVertSpace ); */
+    if(TidyAddVS) {
+        TY_(WriteChar)( '\n', doc->docOut );
+        pprint->line++;
+    }
+
+    pprint->indent[ 0 ].spaces = indent;
+}
+
+static void PCondFlushLineSmart( TidyDocImpl* doc, uint indent )
+{
+    TidyPrintImpl* pprint = &doc->pprint;
+
+    if ( pprint->linelen > 0 )
+    {
+         PFlushLineImpl( doc );
+
+         /* Issue #228 - cfgBool( doc, TidyVertSpace ); */
+         if(TidyAddVS) {
+            TY_(WriteChar)( '\n', doc->docOut );
+            pprint->line++;
+         }
+
          pprint->indent[ 0 ].spaces = indent;
     }
 }
@@ -967,6 +1033,14 @@ static void PPrintText( TidyDocImpl* doc, uint mode, uint indent,
             ixWS = TextStartsWithWhitespace( doc->lexer, node, ix+1, mode );
             ix = IncrWS( ix, end, indent, ixWS );
         }
+        else if (( c == '&' ) && (TY_(HTMLVersion)(doc) == HT50) &&
+            (((ix + 1) == end) || (((ix + 1) < end) && (isspace(doc->lexer->lexbuf[ix+1])))) )
+        {
+            /*\
+             * Issue #207 - This is an unambiguous ampersand need not be 'quoted' in HTML5
+            \*/
+            PPrintChar( doc, c, (mode | CDATA) );
+        }
         else
         {
             PPrintChar( doc, c, mode );
@@ -1141,7 +1215,7 @@ static void PPrintAttribute( TidyDocImpl* doc, uint indent,
         if ( TY_(nodeIsElement)(node) && !first )
         {
             indent += xtra;
-            PCondFlushLine( doc, indent );
+            PCondFlushLineSmart( doc, indent );
         }
         else
           indAttrs = no;
@@ -1448,7 +1522,7 @@ static void PPrintTag( TidyDocImpl* doc,
            See bug #996484 */
         else if ( mode & NOWRAP ||
                   nodeIsBR(node) || AfterSpace(doc->lexer, node))
-            PCondFlushLine( doc, indent );
+            PCondFlushLineSmart( doc, indent );
     }
 }
 
@@ -1513,7 +1587,7 @@ static void PPrintComment( TidyDocImpl* doc, uint indent, Node* node )
     AddString(pprint, "--");
     AddChar( pprint, '>' );
     if ( node->linebreak && node->next )
-        TY_(PFlushLine)( doc, indent );
+        TY_(PFlushLineSmart)( doc, indent );
 }
 
 static void PPrintDocType( TidyDocImpl* doc, uint indent, Node *node )
@@ -1527,7 +1601,7 @@ static void PPrintDocType( TidyDocImpl* doc, uint indent, Node *node )
     /* todo: handle non-ASCII characters in FPI / SI / node->element */
 
     SetWrap( doc, indent );
-    PCondFlushLine( doc, indent );
+    PCondFlushLineSmart( doc, indent );
 
     AddString( pprint, "<!DOCTYPE " );
     SetWrap( doc, indent );
@@ -1550,7 +1624,7 @@ static void PPrintDocType( TidyDocImpl* doc, uint indent, Node *node )
         if (!(i>0&&TY_(tmbstrlen)(sys->value)+2+i<wraplen&&i<=(spaces?spaces:2)*2))
             i = 0;
 
-        PCondFlushLine(doc, i);
+        PCondFlushLineSmart(doc, i);
         if (pprint->linelen)
             AddChar(pprint, ' ');
     }
@@ -1568,7 +1642,7 @@ static void PPrintDocType( TidyDocImpl* doc, uint indent, Node *node )
 
     if (node->content)
     {
-        PCondFlushLine(doc, indent);
+        PCondFlushLineSmart(doc, indent);
         AddChar(pprint, '[');
         PPrintText(doc, CDATA, 0, node->content);
         AddChar(pprint, ']');
@@ -1576,7 +1650,7 @@ static void PPrintDocType( TidyDocImpl* doc, uint indent, Node *node )
 
     SetWrap( doc, 0 );
     AddChar( pprint, '>' );
-    PCondFlushLine( doc, indent );
+    PCondFlushLineSmart( doc, indent );
 }
 
 static void PPrintPI( TidyDocImpl* doc, uint indent, Node *node )
@@ -1641,7 +1715,7 @@ static void PPrintXmlDecl( TidyDocImpl* doc, uint indent, Node *node )
         AddChar( pprint, '?' );
     AddChar( pprint, '>' );
     WrapOn( doc, saveWrap );
-    TY_(PFlushLine)( doc, indent );
+    TY_(PFlushLineSmart)( doc, indent );
 }
 
 /* note ASP and JSTE share <% ... %> syntax */
@@ -1706,14 +1780,14 @@ static void PPrintCDATA( TidyDocImpl* doc, uint indent, Node *node )
     if ( !indentCData )
         indent = 0;
 
-    PCondFlushLine( doc, indent );
+    PCondFlushLineSmart( doc, indent );
     saveWrap = WrapOff( doc );        /* disable wrapping */
 
     AddString( pprint, "<![CDATA[" );
     PPrintText( doc, COMMENT, indent, node );
     AddString( pprint, "]]>" );
 
-    PCondFlushLine( doc, indent );
+    PCondFlushLineSmart( doc, indent );
     WrapOn( doc, saveWrap );          /* restore wrapping */
 }
 
@@ -1866,15 +1940,13 @@ void PPrintScriptStyle( TidyDocImpl* doc, uint mode, uint indent, Node *node )
     Bool    xhtmlOut = cfgBool( doc, TidyXhtmlOut );
 
     if ( InsideHead(doc, node) )
-      TY_(PFlushLine)( doc, indent );
+      TY_(PFlushLineSmart)( doc, indent );
 
-    PCondFlushLine( doc, indent );  /* Issue #56 - long oustanding bug - flush any existing closing tag */
+    PCondFlushLineSmart( doc, indent );  /* Issue #56 - long oustanding bug - flush any existing closing tag */
 
     PPrintTag( doc, mode, indent, node );
 
-    /* use zero indent here, see http://tidy.sf.net/bug/729972 
-       WHY??? TY_(PFlushLine)(doc, 0); */
-    TY_(PFlushLine)(doc, indent);
+    TY_(PFlushLineSmart)(doc, indent);
 
     if ( xhtmlOut && node->content != NULL )
     {
@@ -1905,7 +1977,7 @@ void PPrintScriptStyle( TidyDocImpl* doc, uint mode, uint indent, Node *node )
             AddString( pprint, commentStart );
             AddString( pprint, CDATA_START );
             AddString( pprint, commentEnd );
-            PCondFlushLine( doc, indent );
+            PCondFlushLineSmart( doc, indent );
 
             WrapOn( doc, saveWrap );
         }
@@ -1929,7 +2001,7 @@ void PPrintScriptStyle( TidyDocImpl* doc, uint mode, uint indent, Node *node )
 
     if ( contentIndent < 0 )
     {
-        PCondFlushLine( doc, indent );
+        PCondFlushLineSmart( doc, indent );
         contentIndent = 0;
     }
 
@@ -1944,7 +2016,7 @@ void PPrintScriptStyle( TidyDocImpl* doc, uint mode, uint indent, Node *node )
             AddString( pprint, commentEnd );
 
             WrapOn( doc, saveWrap );
-            PCondFlushLine( doc, indent );
+            PCondFlushLineSmart( doc, indent );
         }
     }
 
@@ -1956,7 +2028,7 @@ void PPrintScriptStyle( TidyDocImpl* doc, uint mode, uint indent, Node *node )
     if ( cfgAutoBool(doc, TidyIndentContent) == TidyNoState
          && node->next != NULL &&
          !( TY_(nodeHasCM)(node, CM_INLINE) || TY_(nodeIsText)(node) ) )
-        TY_(PFlushLine)( doc, indent );
+        TY_(PFlushLineSmart)( doc, indent );
 }
 
 
@@ -2050,6 +2122,11 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
     if ( node == NULL )
         return;
 
+    if (doc->progressCallback)
+    {
+        doc->progressCallback( tidyImplToDoc(doc), node->line, node->column, doc->pprint.line + 1 );
+    }
+
     if (node->type == TextNode)
     {
         PPrintText( doc, mode, indent, node );
@@ -2089,20 +2166,20 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
            or remove the CM_INLINE from the tag
          */
         if ( ! TY_(nodeHasCM)(node, CM_INLINE) )
-            PCondFlushLine( doc, indent );
+            PCondFlushLineSmart( doc, indent );
 
         if ( nodeIsBR(node) && node->prev &&
              !(nodeIsBR(node->prev) || (mode & PREFORMATTED)) &&
              cfgBool(doc, TidyBreakBeforeBR) )
-            TY_(PFlushLine)( doc, indent );
+            TY_(PFlushLineSmart)( doc, indent );
 
         if ( nodeIsHR(node) )
         {
             /* insert extra newline for classic formatting */
-            Bool classic = cfgBool( doc, TidyVertSpace );
+            Bool classic = TidyClassicVS; /* #228 - cfgBool( doc, TidyVertSpace ); */
             if (classic && node->parent && node->parent->content != node)
             {
-                TY_(PFlushLine)( doc, indent );
+                TY_(PFlushLineSmart)( doc, indent );
             }
         }
 
@@ -2111,10 +2188,10 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
         if (node->next)
         {
           if (nodeIsPARAM(node) || nodeIsAREA(node))
-              PCondFlushLine(doc, indent);
+              PCondFlushLineSmart(doc, indent);
           else if ((nodeIsBR(node) && !(mode & PREFORMATTED))
                    || nodeIsHR(node))
-              TY_(PFlushLine)(doc, indent);
+              TY_(PFlushLineSmart)(doc, indent);
         }
     }
     else /* some kind of container element */
@@ -2125,34 +2202,35 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
         if ( node->tag && 
              (node->tag->parser == TY_(ParsePre) || nodeIsTEXTAREA(node)) )
         {
-            Bool classic  = cfgBool( doc, TidyVertSpace );
+            Bool classic  = TidyClassicVS; /* #228 - cfgBool( doc, TidyVertSpace ); */
             uint indprev = indent;
-            PCondFlushLine( doc, indent );
 
-            PCondFlushLine( doc, indent );
+            PCondFlushLineSmart( doc, indent ); /* about to add <pre> tag - clear any previous */
 
             /* insert extra newline for classic formatting */
             if (classic && node->parent && node->parent->content != node)
             {
-                TY_(PFlushLine)( doc, indent );
+                TY_(PFlushLineSmart)( doc, indent );
             }
-            PPrintTag( doc, mode, indent, node );
+
+            PPrintTag( doc, mode, indent, node );   /* add <pre> or <textarea> tag */
 
             indent = 0;
-            TY_(PFlushLine)( doc, indent );
+            /* @camoy Fix #158 - remove inserted newlines in pre - TY_(PFlushLineSmart)( doc, indent ); */
 
             for ( content = node->content; content; content = content->next )
             {
                 TY_(PPrintTree)( doc, (mode | PREFORMATTED | NOWRAP),
                                  indent, content );
             }
-            PCondFlushLine( doc, indent );
+
+            /* @camoy Fix #158 - remove inserted newlines in pre - PCondFlushLineSmart( doc, indent ); */
             indent = indprev;
             PPrintEndTag( doc, mode, indent, node );
 
             if ( cfgAutoBool(doc, TidyIndentContent) == TidyNoState
                  && node->next != NULL )
-                TY_(PFlushLine)( doc, indent );
+                TY_(PFlushLineSmart)( doc, indent );
         }
         else if ( nodeIsSTYLE(node) || nodeIsSCRIPT(node) )
         {
@@ -2181,7 +2259,7 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
             if ( ShouldIndent(doc, node) )
             {
                 indent += spaces;
-                PCondFlushLine( doc, indent );
+                PCondFlushLineSmart( doc, indent );
 
                 for ( content = node->content;
                       content != NULL;
@@ -2189,7 +2267,7 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
                     TY_(PPrintTree)( doc, mode, indent, content );
 
                 indent -= spaces;
-                PCondFlushLine( doc, indent );
+                PCondFlushLineSmart( doc, indent );
                 /* PCondFlushLine( doc, indent ); */
             }
             else
@@ -2207,19 +2285,19 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
             Bool indsmart = ( cfgAutoBool(doc, TidyIndentContent) == TidyAutoState );
             Bool hideend  = cfgBool( doc, TidyHideEndTags ) ||
               cfgBool( doc, TidyOmitOptionalTags );
-            Bool classic  = cfgBool( doc, TidyVertSpace );
+            Bool classic  = TidyClassicVS; /* #228 - cfgBool( doc, TidyVertSpace ); */
             uint contentIndent = indent;
 
             /* insert extra newline for classic formatting */
             if (classic && node->parent && node->parent->content != node && !nodeIsHTML(node))
             {
-                TY_(PFlushLine)( doc, indent );
+                TY_(PFlushLineSmart)( doc, indent );
             }
 
             if ( ShouldIndent(doc, node) )
                 contentIndent += spaces;
 
-            PCondFlushLine( doc, indent );
+            PCondFlushLineSmart( doc, indent );
 
             /*\
              *  Issue #180 - with the above PCondFlushLine, 
@@ -2227,7 +2305,7 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
              *  Maybe only if 'classic' ie --vertical-space yes 
             \*/
             if ( indsmart && node->prev != NULL && classic)
-                TY_(PFlushLine)( doc, indent );
+                TY_(PFlushLineSmart)( doc, indent );
 
             /* do not omit elements with attributes */
             if ( !hideend || !TY_(nodeHasCM)(node, CM_OMITST) ||
@@ -2240,11 +2318,20 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
                     /* fix for bug 530791, don't wrap after */
                     /* <li> if first child is text node     */
                     if (!(nodeIsLI(node) && TY_(nodeIsText)(node->content)))
-                        PCondFlushLine( doc, contentIndent );
+                        PCondFlushLineSmart( doc, contentIndent );
                 }
                 else if ( TY_(nodeHasCM)(node, CM_HTML) || nodeIsNOFRAMES(node) ||
                           (TY_(nodeHasCM)(node, CM_HEAD) && !nodeIsTITLE(node)) )
-                    TY_(PFlushLine)( doc, contentIndent );
+                    TY_(PFlushLineSmart)( doc, contentIndent );
+            }
+            else if ( ShouldIndent(doc, node) )
+            {
+                /*\
+                 * Issue #180 - If the tag was NOT printed due to the -omit option,
+                 * then reduce the bumped indent under the same ShouldIndent(doc, node) 
+                 * conditions that caused the indent to be bumped.
+                \*/
+                contentIndent -= spaces;
             }
 
             last = NULL;
@@ -2255,7 +2342,7 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
                      content->tag && !TY_(nodeHasCM)(content, CM_INLINE) )
                 {
                     /* TY_(PFlushLine)(fout, indent); */
-                    TY_(PFlushLine)( doc, contentIndent );
+                    TY_(PFlushLineSmart)( doc, contentIndent );
                 }
 
                 TY_(PPrintTree)( doc, mode, contentIndent, content );
@@ -2272,7 +2359,7 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
                  )
                )
             {
-                PCondFlushLine( doc, indent );
+                PCondFlushLineSmart( doc, indent );
                 if ( !hideend || !TY_(nodeHasCM)(node, CM_OPT) )
                 {
                     PPrintEndTag( doc, mode, indent, node );
@@ -2285,15 +2372,15 @@ void TY_(PPrintTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
                 {
                     /* newline before endtag for classic formatting */
                     if ( classic && !HasMixedContent(node) )
-                        TY_(PFlushLine)( doc, indent );
+                        TY_(PFlushLineSmart)( doc, indent );
                     PPrintEndTag( doc, mode, indent, node );
                 }
             }
 
             if (!indcont && !hideend && !nodeIsHTML(node) && !classic)
-                TY_(PFlushLine)( doc, indent );
+                TY_(PFlushLineSmart)( doc, indent );
             else if (classic && node->next != NULL && TY_(nodeHasCM)(node, CM_LIST|CM_DEFLIST|CM_TABLE|CM_BLOCK/*|CM_HEADING*/))
-                TY_(PFlushLine)( doc, indent );
+                TY_(PFlushLineSmart)( doc, indent );
         }
     }
 }
@@ -2304,13 +2391,18 @@ void TY_(PPrintXMLTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
     if (node == NULL)
         return;
 
+    if (doc->progressCallback)
+    {
+        doc->progressCallback( tidyImplToDoc(doc), node->line, node->column, doc->pprint.line + 1 );
+    }
+    
     if ( node->type == TextNode)
     {
         PPrintText( doc, mode, indent, node );
     }
     else if ( node->type == CommentTag )
     {
-        PCondFlushLine( doc, indent );
+        PCondFlushLineSmart( doc, indent );
         PPrintComment( doc, indent, node);
         /* PCondFlushLine( doc, 0 ); */
     }
@@ -2341,7 +2433,7 @@ void TY_(PPrintXMLTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
     else if ( TY_(nodeHasCM)(node, CM_EMPTY) ||
               (node->type == StartEndTag && !xhtmlOut) )
     {
-        PCondFlushLine( doc, indent );
+        PCondFlushLineSmart( doc, indent );
         PPrintTag( doc, mode, indent, node );
         /* TY_(PFlushLine)( doc, indent ); */
     }
@@ -2361,7 +2453,7 @@ void TY_(PPrintXMLTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
             }
         }
 
-        PCondFlushLine( doc, indent );
+        PCondFlushLineSmart( doc, indent );
 
         if ( TY_(XMLPreserveWhiteSpace)(doc, node) )
         {
@@ -2376,13 +2468,13 @@ void TY_(PPrintXMLTree)( TidyDocImpl* doc, uint mode, uint indent, Node *node )
 
         PPrintTag( doc, mode, indent, node );
         if ( !mixed && node->content )
-            TY_(PFlushLine)( doc, cindent );
+            TY_(PFlushLineSmart)( doc, cindent );
  
         for ( content = node->content; content; content = content->next )
             TY_(PPrintXMLTree)( doc, mode, cindent, content );
 
         if ( !mixed && node->content )
-            PCondFlushLine( doc, indent );
+            PCondFlushLineSmart( doc, indent );
 
         PPrintEndTag( doc, mode, indent, node );
         /* PCondFlushLine( doc, indent ); */

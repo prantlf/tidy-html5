@@ -204,6 +204,13 @@ static ParseProperty ParseDocType;
 /* keep-first or keep-last? */
 static ParseProperty ParseRepeatAttr;
 
+/*\
+ * 20150515 - support using tabs instead of spaces - Issue #108
+ * (a) parser for 't'/'f', 'true'/'false', 'y'/'n', 'yes'/'no' or '1'/'0' 
+ * (b) sets the TidyIndentSpaces to 1 if 'yes'
+ * (c) sets the indent_char to '\t' or ' '
+\*/
+static ParseProperty ParseTabs;
 
 static const TidyOptionImpl option_defs[] =
 {
@@ -302,7 +309,7 @@ static const TidyOptionImpl option_defs[] =
   { TidyEmptyTags,               MU, "new-empty-tags",              ST, 0,               ParseTagNames,     NULL            },
   { TidyPreTags,                 MU, "new-pre-tags",                ST, 0,               ParseTagNames,     NULL            },
   { TidyAccessibilityCheckLevel, DG, "accessibility-check",         IN, 0,               ParseAcc,          accessPicks     },
-  { TidyVertSpace,               PP, "vertical-space",              BL, no,              ParseBool,         boolPicks       },
+  { TidyVertSpace,               PP, "vertical-space",              IN, no,              ParseAutoBool,     autoBoolPicks   }, /* #228 - tri option */
 #if SUPPORT_ASIAN_ENCODINGS
   { TidyPunctWrap,               PP, "punctuation-wrap",            BL, no,              ParseBool,         boolPicks       },
 #endif
@@ -313,6 +320,8 @@ static const TidyOptionImpl option_defs[] =
   { TidySortAttributes,          PP, "sort-attributes",             IN, TidySortAttrNone,ParseSorter,       sorterPicks     },
   { TidyMergeSpans,              MU, "merge-spans",                 IN, TidyAutoState,   ParseAutoBool,     autoBoolPicks   },
   { TidyAnchorAsName,            MU, "anchor-as-name",              BL, yes,             ParseBool,         boolPicks       },
+  { TidyPPrintTabs,              PP, "indent-with-tabs",            BL, no,              ParseTabs,         boolPicks       }, /* 20150515 - Issue #108 */
+  { TidySkipNested,              MU, "skip-nested",                 BL, yes,             ParseBool,         boolPicks       }, /* 1642186 - Issue #65 */
   { N_TIDY_OPTIONS,              XX, NULL,                          XY, 0,               NULL,              NULL            }
 };
 
@@ -371,7 +380,10 @@ static Bool SetOptionValue( TidyDocImpl* doc, TidyOptionId optId, ctmbstr val )
    {
       assert( option->id == optId && option->type == TidyString );
       FreeOptionValue( doc, option, &doc->config.value[ optId ] );
-      doc->config.value[ optId ].p = TY_(tmbstrdup)( doc->allocator, val );
+      if ( TY_(tmbstrlen)(val)) /* Issue #218 - ONLY if it has LENGTH! */
+          doc->config.value[ optId ].p = TY_(tmbstrdup)( doc->allocator, val );
+      else
+          doc->config.value[ optId ].p = 0; /* should already be zero, but to be sure... */
    }
    return status;
 }
@@ -917,7 +929,10 @@ Bool TY_(ParseConfigValue)( TidyDocImpl* doc, TidyOptionId optId, ctmbstr optval
         TidyBuffer inbuf;            /* Set up input source */
         tidyBufInitWithAllocator( &inbuf, doc->allocator );
         tidyBufAttach( &inbuf, (byte*)optval, TY_(tmbstrlen)(optval)+1 );
-        doc->config.cfgIn = TY_(BufferInput)( doc, &inbuf, ASCII );
+        if (optId == TidyOutFile)
+            doc->config.cfgIn = TY_(BufferInput)( doc, &inbuf, RAW );
+        else
+            doc->config.cfgIn = TY_(BufferInput)( doc, &inbuf, ASCII );
         doc->config.c = GetC( &doc->config );
 
         status = option->parser( doc, option );
@@ -1191,7 +1206,10 @@ Bool ParseCSS1Selector( TidyDocImpl* doc, const TidyOptionImpl* option )
     }
     buf[i] = '\0';
 
-    if ( i == 0 || !TY_(IsCSS1Selector)(buf) ) {
+    if ( i == 0 ) {
+        return no;
+    }
+    else if ( !TY_(IsCSS1Selector)(buf) ) {
         TY_(ReportBadArgument)( doc, option->name );
         return no;
     }
@@ -1203,6 +1221,28 @@ Bool ParseCSS1Selector( TidyDocImpl* doc, const TidyOptionImpl* option )
     SetOptionValue( doc, option->id, buf );
     return yes;
 }
+
+/*\
+ * 20150515 - support using tabs instead of spaces - Issue #108
+ * Sets the indent character to a tab if on, and set indent space count to 1
+ * and sets indent character to a space if off.
+\*/
+Bool ParseTabs( TidyDocImpl* doc, const TidyOptionImpl* entry )
+{
+    ulong flag = 0;
+    Bool status = ParseTriState( TidyNoState, doc, entry, &flag );
+    if ( status ) {
+        Bool tabs = flag != 0 ? yes : no;
+        TY_(SetOptionBool)( doc, entry->id, tabs );
+        if (tabs) {
+            TY_(SetOptionInt)( doc, TidyIndentSpaces, 1 );
+        } else {
+            /* optional - TY_(ResetOptionToDefault)( doc, TidyIndentSpaces ); */
+        }
+    }
+    return status;
+}
+
 
 /* Coordinates Config update and Tags data */
 static void DeclareUserTag( TidyDocImpl* doc, TidyOptionId optId,

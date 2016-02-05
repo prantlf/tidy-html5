@@ -71,6 +71,8 @@ LIBDIR = ${TOPDIR}/lib
 BINDIR = ${TOPDIR}/bin
 DOCDIR = ${TOPDIR}/htmldoc
 
+TIDY_VERSION = $(shell head -n 1 ../../version.txt)
+
 # Note about shared library and exported symbols:
 # With gcc, one can control the exported symbols by either using 
 # "-fvisibility=hidden -DTIDY_EXPORT='__attribute__((visibility("default")))'"
@@ -85,13 +87,13 @@ DOCDIR = ${TOPDIR}/htmldoc
 # CFLAGS etc..
 # For optimised builds, flags such as "-O2" should be added and -D_DEBUG=1
 # disabled.
-CC= emcc
-CFLAGS= -Oz -pedantic -Wall -I $(INCDIR)
+CC=emcc
+CFLAGS=-Oz -DNDEBUG -DLIBTIDY_VERSION=\"$(TIDY_VERSION)\" -DSUPPORT_LOCALIZATIONS=0 -pedantic -Wall -I $(INCDIR)
 # flags only supported with gcc 3.x
 CFLAGS += -Wunused-parameter
 
 # Flags used for the generation of the js file
-EMFLAGS= -O3  --memory-init-file 0 --pre-js wrapper.js
+EMFLAGS=-O3 --memory-init-file 0 --pre-js wrapper.js
 
 OTHERCFLAGS=
 # OTHERCFLAGS+= -fvisibility=hidden -DTIDY_EXPORT='__attribute__((visibility("default")))'
@@ -136,24 +138,26 @@ OBJFILES=\
         $(OBJDIR)/access$(OBJSUF)     $(OBJDIR)/attrs$(OBJSUF)      $(OBJDIR)/istack$(OBJSUF) \
         $(OBJDIR)/parser$(OBJSUF)     $(OBJDIR)/tags$(OBJSUF)       $(OBJDIR)/entities$(OBJSUF) \
         $(OBJDIR)/lexer$(OBJSUF)      $(OBJDIR)/pprint$(OBJSUF)     $(OBJDIR)/clean$(OBJSUF) \
-        $(OBJDIR)/localize$(OBJSUF)   $(OBJDIR)/config$(OBJSUF)     $(OBJDIR)/alloc$(OBJSUF) \
+        $(OBJDIR)/message$(OBJSUF)    $(OBJDIR)/config$(OBJSUF)     $(OBJDIR)/alloc$(OBJSUF) \
         $(OBJDIR)/attrask$(OBJSUF)    $(OBJDIR)/attrdict$(OBJSUF)   $(OBJDIR)/attrget$(OBJSUF) \
         $(OBJDIR)/buffio$(OBJSUF)     $(OBJDIR)/fileio$(OBJSUF)     $(OBJDIR)/streamio$(OBJSUF) \
         $(OBJDIR)/tagask$(OBJSUF)     $(OBJDIR)/tmbstr$(OBJSUF)     $(OBJDIR)/utf8$(OBJSUF) \
-        $(OBJDIR)/tidylib$(OBJSUF)    $(OBJDIR)/mappedio$(OBJSUF)   $(OBJDIR)/gdoc$(OBJSUF)
+        $(OBJDIR)/tidylib$(OBJSUF)    $(OBJDIR)/mappedio$(OBJSUF)   $(OBJDIR)/gdoc$(OBJSUF) \
+        $(OBJDIR)/language$(OBJSUF)
 
 CFILES= \
         $(SRCDIR)/access.c       $(SRCDIR)/attrs.c        $(SRCDIR)/istack.c \
         $(SRCDIR)/parser.c       $(SRCDIR)/tags.c         $(SRCDIR)/entities.c \
         $(SRCDIR)/lexer.c        $(SRCDIR)/pprint.c       $(SRCDIR)/clean.c \
-        $(SRCDIR)/localize.c     $(SRCDIR)/config.c       $(SRCDIR)/alloc.c \
+        $(SRCDIR)/message.c      $(SRCDIR)/config.c       $(SRCDIR)/alloc.c \
         $(SRCDIR)/attrask.c      $(SRCDIR)/attrdict.c     $(SRCDIR)/attrget.c \
         $(SRCDIR)/buffio.c       $(SRCDIR)/fileio.c       $(SRCDIR)/streamio.c \
         $(SRCDIR)/tagask.c       $(SRCDIR)/tmbstr.c       $(SRCDIR)/utf8.c \
-        $(SRCDIR)/tidylib.c      $(SRCDIR)/mappedio.c     $(SRCDIR)/gdoc.c
+        $(SRCDIR)/tidylib.c      $(SRCDIR)/mappedio.c     $(SRCDIR)/gdoc.c \
+        $(SRCDIR)/language.c
 
-HFILES= $(INCDIR)/platform.h     $(INCDIR)/tidy.h         $(INCDIR)/tidyenum.h \
-        $(INCDIR)/buffio.h
+HFILES= $(INCDIR)/tidyplatform.h $(INCDIR)/tidy.h         $(INCDIR)/tidyenum.h \
+        $(INCDIR)/tidybuffio.h
 
 LIBHFILES= \
         $(SRCDIR)/access.h       $(SRCDIR)/attrs.h        $(SRCDIR)/attrdict.h \
@@ -162,7 +166,7 @@ LIBHFILES= \
         $(SRCDIR)/mappedio.h     $(SRCDIR)/message.h      $(SRCDIR)/parser.h \
         $(SRCDIR)/pprint.h       $(SRCDIR)/streamio.h     $(SRCDIR)/tags.h \
         $(SRCDIR)/tmbstr.h       $(SRCDIR)/utf8.h         $(SRCDIR)/tidy-int.h \
-        $(SRCDIR)/gdoc.h         $(SRCDIR)/version.h
+        $(SRCDIR)/gdoc.h         $(SRCDIR)/version.h      $(SRCDIR)/language.h
 
 
 

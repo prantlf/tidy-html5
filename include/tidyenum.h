@@ -76,11 +76,17 @@ typedef enum
 
 
 /** Option IDs Used to get/set option values.
+
+    These TidyOptionId are used throughout libtidy, and also
+    have associated localized strings to describe them.
+ 
+    Note this enum MUST start at zero due to historical design-time
+    decisions that make assumptions about this starting value.
 */
 typedef enum
 {
   TidyUnknownOption,   /**< Unknown option! */
-  TidyIndentSpaces,    /**< Indentation n spaces */
+  TidyIndentSpaces,    /**< Indentation n spaces/tabs */
   TidyWrapLen,         /**< Wrap margin */
   TidyTabSize,         /**< Expand tabs to n spaces */
 
@@ -204,9 +210,12 @@ typedef enum
   TidySortAttributes,      /**< Sort attributes */
   TidyMergeSpans,       /**< Merge multiple SPANs */
   TidyAnchorAsName,    /**< Define anchors as name attributes */
+  TidyPPrintTabs,       /**< Indent using tabs istead of spaces */
+  TidySkipNested,      /**< Skip nested tags in script and style CDATA */
   N_TIDY_OPTIONS       /**< Must be last */
 } TidyOptionId;
 
+    
 /** Option data types
 */
 typedef enum
@@ -265,6 +274,7 @@ typedef enum
     TidySortAttrAlpha
 } TidyAttrSortStrategy;
 
+
 /* I/O and Message handling interface
 **
 ** By default, Tidy will define, create and use
@@ -278,6 +288,11 @@ typedef enum
 */
 
 /** Message severity level
+ *  These TidyReportLevel are used throughout libtidy, but don't
+ *  have associated localized strings to describe them because
+ *  TidyReportLevel is externally-facing, and changing the enum
+ *  starting int can break existing API's for poorly-written
+ *  applications using libtidy. See enum `TidyReportLevelKeys`.
 */
 typedef enum
 {
@@ -289,6 +304,22 @@ typedef enum
   TidyBadDocument,      /**< I/O or file system error */
   TidyFatal             /**< Crash! */
 } TidyReportLevel;
+
+/** Message severity level - string lookup keys
+ *  These TidyReportLevelKeys are used throughout libtidy, and
+ *  have associated localized strings to describe them. They
+ *  correspond to enum `TidyReportLevel`.
+*/
+typedef enum
+{
+  TidyInfoString = 600,
+  TidyWarningString,
+  TidyConfigString,
+  TidyAccessString,
+  TidyErrorString,
+  TidyBadDocumentString,
+  TidyFatalString
+} TidyReportLevelKeys;
 
 
 /* Document tree traversal functions
@@ -789,7 +820,7 @@ typedef enum
   TidyAttr_ARIA_VALUETEXT,
 
   /* SVG attributes (SVG 1.1) */
-  TidyAttr_X,					/**< X= */
+  TidyAttr_X,                   /**< X= */
   TidyAttr_Y,                   /**< Y= */
   TidyAttr_VIEWBOX,             /**< VIEWBOX= */
   TidyAttr_PRESERVEASPECTRATIO, /**< PRESERVEASPECTRATIO= */
@@ -799,6 +830,16 @@ typedef enum
   TidyAttr_CONTENTSTYLETYPE,    /**< CONTENTSTYLETYPE= */
   /* MathML <math> attributes */
   TidyAttr_DISPLAY,             /**< DISPLAY= (html5) */
+
+  /* RDFa global attributes */
+  TidyAttr_ABOUT,             /**< ABOUT= */
+  TidyAttr_DATATYPE,          /**< DATATYPE= */
+  TidyAttr_INLIST,            /**< INLIST= */
+  TidyAttr_PREFIX,            /**< PREFIX= */
+  TidyAttr_PROPERTY,          /**< PROPERTY= */
+  TidyAttr_RESOURCE,          /**< RESOURCE= */
+  TidyAttr_TYPEOF,            /**< TYPEOF= */
+  TidyAttr_VOCAB,             /**< VOCAB= */
 
   N_TIDY_ATTRIBS              /**< Must be last */
 } TidyAttrId;

@@ -23,6 +23,9 @@
  *
  */
 
+#ifdef _MSC_VER
+#pragma warning( disable : 4995 )
+#endif
 // Module: sprtf.cxx
 // Debug log file output
 #include <stdio.h> // fopen()...
@@ -31,6 +34,9 @@
 #ifdef _MSC_VER
 #include <WinSock2.h>
 #include <sys/timeb.h>
+#if (defined(UNICODE) || defined(_UNICODE))
+#include <Strsafe.h>
+#endif
 #else /* !_MSC_VER */
 #include <sys/time.h> // gettimeoday(), struct timeval,...
 #endif /* _MSC_VER y/n */
@@ -318,55 +324,55 @@ static void oi( char * psin )
 
 #ifdef _MSC_VER
 // service to ensure line endings in windows only
-static void	prt( char * ps )
+static void prt( char * ps )
 {
     static char _s_buf[1024];
-	char * pb = _s_buf;
-	size_t i, j, k;
-	char   c, d;
+    char * pb = _s_buf;
+    size_t i, j, k;
+    char   c, d;
     i = strlen(ps);
-	k = 0;
-	d = 0;
-	if(i) {
-		k = 0;
-		d = 0;
-		for( j = 0; j < i; j++ ) {
-			c = ps[j];
-			if( c == 0x0d ) {
-				if( (j+1) < i ) {
-					if( ps[j+1] != 0x0a ) {
-						pb[k++] = c;
-						c = 0x0a;
-					}
+    k = 0;
+    d = 0;
+    if(i) {
+        k = 0;
+        d = 0;
+        for( j = 0; j < i; j++ ) {
+            c = ps[j];
+            if( c == 0x0d ) {
+                if( (j+1) < i ) {
+                    if( ps[j+1] != 0x0a ) {
+                        pb[k++] = c;
+                        c = 0x0a;
+                    }
             } else {
-					pb[k++] = c;
-					c = 0x0a;
-				}
-			} else if( c == 0x0a ) {
-				if( d != 0x0d ) {
-					pb[k++] = 0x0d;
-				}
-			}
-			pb[k++] = c;
-			d = c;
-			if( k >= MXIO ) {
-				pb[k] = 0;
-				oi(pb);
-				k = 0;
-			}
-		}	// for length of string
-		if( k ) {
-			//if( ( gbCheckCrLf ) &&
-			//	( d != 0x0a ) ) {
-				// add Cr/Lf pair
-				//pb[k++] = 0x0d;
-				//pb[k++] = 0x0a;
-				//pb[k] = 0;
-			//}
-			pb[k] = 0;
-			oi( pb );
-		}
-	}
+                    pb[k++] = c;
+                    c = 0x0a;
+                }
+            } else if( c == 0x0a ) {
+                if( d != 0x0d ) {
+                    pb[k++] = 0x0d;
+                }
+            }
+            pb[k++] = c;
+            d = c;
+            if( k >= MXIO ) {
+                pb[k] = 0;
+                oi(pb);
+                k = 0;
+            }
+        }   // for length of string
+        if( k ) {
+            //if( ( gbCheckCrLf ) &&
+            //  ( d != 0x0a ) ) {
+                // add Cr/Lf pair
+                //pb[k++] = 0x0d;
+                //pb[k++] = 0x0a;
+                //pb[k] = 0;
+            //}
+            pb[k] = 0;
+            oi( pb );
+        }
+    }
 }
 #endif // #ifdef _MSC_VER
 

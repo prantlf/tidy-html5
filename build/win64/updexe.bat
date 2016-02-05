@@ -1,7 +1,8 @@
 @setlocal
 @REM copy the EXE into C:\MDOS, IFF changed
 @set TMPDIR=C:\MDOS
-@set TMPFIL1=tidy5.exe
+@REM v5.0.0
+@set TMPFIL1=tidy.exe
 @set TMPFIL2=tidy5.exe
 @set TMPSRC=Release\%TMPFIL1%
 @if NOT EXIST %TMPSRC% goto ERR1
@@ -10,6 +11,25 @@
 
 @if NOT EXIST %TMPDIR%\nul goto ERR2
 @set TMPDST=%TMPDIR%\%TMPFIL2%
+
+@call :CHKCOPY
+
+@set TMPFIL1=tidyd.exe
+@set TMPFIL2=tidy5d.exe
+@set TMPSRC=Debug\%TMPFIL1%
+@if NOT EXIST %TMPSRC% goto ERR1
+@echo Current source %TMPSRC%
+@call dirmin %TMPSRC%
+
+@if NOT EXIST %TMPDIR%\nul goto ERR2
+@set TMPDST=%TMPDIR%\%TMPFIL2%
+
+@call :CHKCOPY
+
+@goto END
+
+:CHKCOPY
+
 @if NOT EXIST %TMPDST% goto DOCOPY
 
 @echo Current destination %TMPDST%
@@ -22,7 +42,7 @@
 @echo.
 @echo Files are the SAME... Nothing done...
 @echo.
-@goto END
+@goto :EOF
 
 :NOFC4
 @echo Can NOT run fc4! so doing copy...
@@ -30,8 +50,11 @@
 copy %TMPSRC% %TMPDST%
 @if NOT EXIST %TMPDST% goto ERR3
 @call dirmin %TMPDST%
+@echo.
 @echo Done file update...
-@goto END
+@echo.
+@goto :EOF
+
 
 :ERR1
 @echo Source %TMPSRC% does NOT exist! Has it been built? *** FIX ME ***
