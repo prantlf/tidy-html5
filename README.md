@@ -2,6 +2,8 @@
 
 All other READMEs and related materials can be found in [README/][100]. Although all of our materials should be linked in this README, be sure to check this directory for documents we’ve not yet added to this document.
 
+This fork compiles the latest version of the original [tidy-html5](https://github.com/htacg/tidy-html5/) to JavaScript using the latest [emscripten](https://github.com/kripken/emscripten). See [README/EMSCRIPTEN.md][165] for more information.
+
 ## Building HTML Tidy
 
   - For build instructions please see [README/BUILD.md][115].
@@ -93,4 +95,5 @@ HTML Tidy and LibTidy are free and open source software with a permissive licens
   [150]: README/MESSAGE.md
   [155]: README/OPTIONS.md
   [160]: README/VERSION.md
+  [165]: README/EMSCRIPTEN.md
  
