@@ -207,7 +207,7 @@ Bool TIDY_CALL tidyBufEndOfInput( TidyBuffer* buf )
     return ( buf->next >= buf->size );
 }
 
-void TIDY_CALL tidyBufUngetByte( TidyBuffer* buf, byte bv )
+void TIDY_CALL tidyBufUngetByte( TidyBuffer* buf, byte ARG_UNUSED(bv) )
 {
     if ( buf->next > 0 )
     {

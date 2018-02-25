@@ -508,7 +508,7 @@ static struct _dispatchTable {
 ** even if the signature matches some unrelated report that you wish to
 ** generate.
 */
-TidyMessageImpl *formatAccessReport(TidyDocImpl* doc, Node *element, Node *node, uint code, uint level, va_list args)
+TidyMessageImpl *formatAccessReport(TidyDocImpl* doc, Node *ARG_UNUSED(element), Node *node, uint code, uint level, va_list args)
 {
     doc->badAccess |= BA_WAI;
 
@@ -527,7 +527,7 @@ TidyMessageImpl *formatAccessReport(TidyDocImpl* doc, Node *element, Node *node,
 ** provides local variables that are used principally in the formats used for
 ** the attribute related reports.
 */
-TidyMessageImpl *formatAttributeReport(TidyDocImpl* doc, Node *element, Node *node, uint code, uint level, va_list args)
+TidyMessageImpl *formatAttributeReport(TidyDocImpl* doc, Node *element, Node *node, uint code, uint level, va_list ARG_UNUSED(args))
 {
     AttVal *av = NULL;
     char const *name = "NULL";
@@ -609,7 +609,7 @@ TidyMessageImpl *formatAttributeReport(TidyDocImpl* doc, Node *element, Node *no
 **   however these states are captured to generate future output, which may be
 **   useful here in the long run.
 */
-TidyMessageImpl *formatEncodingReport(TidyDocImpl* doc, Node *element, Node *node, uint code, uint level, va_list args)
+TidyMessageImpl *formatEncodingReport(TidyDocImpl* doc, Node *ARG_UNUSED(element), Node *ARG_UNUSED(node), uint code, uint level, va_list args)
 {
     char buf[ 32 ] = {'\0'};
     uint c = va_arg( args, uint );
@@ -862,7 +862,7 @@ TidyMessageImpl *formatStandard(TidyDocImpl* doc, Node *element, Node *node, uin
 /* Provides general formatting as formatStandard, except TidyReportLevel is set
 ** dynamically for these items as it cannot be predicted except at runtime.
  */
-TidyMessageImpl *formatStandardDynamic(TidyDocImpl* doc, Node *element, Node *node, uint code, uint level, va_list args)
+TidyMessageImpl *formatStandardDynamic(TidyDocImpl* doc, Node *ARG_UNUSED(element), Node *node, uint code, uint ARG_UNUSED(level), va_list ARG_UNUSED(args))
 {
     char nodedesc[ 256 ] = {0};
 

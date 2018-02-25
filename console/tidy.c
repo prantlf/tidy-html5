@@ -267,8 +267,8 @@ static void print3Columns(const char* fmt, /**< The three column format string. 
 
 /** Provides the `unknown option` output to the current errout.
  */
-static void unknownOption(TidyDoc tdoc, /**< The Tidy document. */
-                          uint c        /**< The unknown option. */
+static void unknownOption(TidyDoc ARG_UNUSED(tdoc), /**< The Tidy document. */
+                          uint c                    /**< The unknown option. */
                           )
 {
     fprintf( errout, tidyLocalizedString( TC_STRING_UNKNOWN_OPTION ), (char)c );
@@ -799,7 +799,7 @@ static ctmbstr get_final_name( ctmbstr prog )
 /** Outputs all of the complete help options (text).
  ** @param tdoc The Tidydoc whose options are being printed.
  */
-static void print_help_options( TidyDoc tdoc )
+static void print_help_options( TidyDoc ARG_UNUSED(tdoc) )
 {
     CmdOptCategory cat = CmdOptCatFIRST;
     const CmdOptDesc* pos = cmdopt_defs;
@@ -1004,7 +1004,7 @@ static void optionhelp( TidyDoc tdoc )
 /** Handles the -help-env service.
  ** @param tdoc The Tidy document.
  */
-static void helpEnv( TidyDoc tdoc )
+static void helpEnv( TidyDoc ARG_UNUSED(tdoc) )
 {
     tmbstr subst = "";
     Bool uses_env = getenv("HTML_TIDY") != NULL;
@@ -1389,7 +1389,7 @@ void tidyPrintTidyLanguageNames( ctmbstr format )
  **         output to a file.
  ** @param tdoc The Tidy document.
  */
-static void lang_help( TidyDoc tdoc )
+static void lang_help( TidyDoc ARG_UNUSED(tdoc) )
 {
     printf( "\n" );
     printf( "%s", tidyLocalizedString(TC_TXT_HELP_LANG_1) );
@@ -1560,7 +1560,7 @@ static void exportDefaultOptionValues( TidyDoc tdoc )
 
 /** Handles the -version service.
  */
-static void version( TidyDoc tdoc )
+static void version( TidyDoc ARG_UNUSED(tdoc) )
 {
     if ( tidyPlatform() )
         printf( tidyLocalizedString( TC_STRING_VERS_A ), tidyPlatform(), tidyLibraryVersion() );
@@ -1618,8 +1618,8 @@ static void printXMLCrossRef(TidyDoc tdoc,   /**< The Tidy document. */
 
 /** Prints for XML an option's `<eqconfig>`.
  */
-static void printXMLCrossRefEqConsole(TidyDoc tdoc,   /**< The Tidy document. */
-                                      TidyOption topt /**< The option. */
+static void printXMLCrossRefEqConsole(TidyDoc ARG_UNUSED(tdoc), /**< The Tidy document. */
+                                      TidyOption topt           /**< The option. */
                                       )
 {
     const CmdOptDesc* pos = cmdopt_defs;
@@ -1727,7 +1727,7 @@ static void XMLoptionhelp( TidyDoc tdoc )
  ** symbol.
  ** @param tdoc The Tidy document.
  **/
-static void xml_error_strings( TidyDoc tdoc )
+static void xml_error_strings( TidyDoc ARG_UNUSED(tdoc) )
 {
     uint errorCode;
     ctmbstr localizedString;
@@ -1927,7 +1927,7 @@ static void xml_strings( void )
  ** - other things that are user facing and best not put into LibTidy
  **   proper.
  */
-static Bool TIDY_CALL reportCallback(TidyMessage tmessage)
+static Bool TIDY_CALL reportCallback(TidyMessage ARG_UNUSED(tmessage))
 {
 #if 0
     TidyIterator pos;
