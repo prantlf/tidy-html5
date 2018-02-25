@@ -1,14 +1,21 @@
 @setlocal
+@REM 20170702 - Check branch
+@set TMPBR=next
+@REM 20161002 - Change to msvc140 build
+@set VCVERS=14
+@set GENERATOR=Visual Studio %VCVERS% Win64
+@REM 20160324 - Change to relative, and use choice
 @set TMPPRJ=tidy
 @echo Build %TMPPRJ% project, in 64-bits
 @set TMPLOG=bldlog-1.txt
 @set BLDDIR=%CD%
-@set TMPROOT=F:\Projects
-@set SET_BAT=%ProgramFiles(x86)%\Microsoft Visual Studio 10.0\VC\vcvarsall.bat
+@set TMPROOT=..\..\..
+@set SET_BAT=%ProgramFiles(x86)%\Microsoft Visual Studio %VCVERS%.0\VC\vcvarsall.bat
 @if NOT EXIST "%SET_BAT%" goto NOBAT
-@if NOT EXIST %TMPROOT%\nul goto NOROOT
-@set TMPSRC=%TMPROOT%\tidy-html5
+@REM if NOT EXIST %TMPROOT%\nul goto NOROOT
+@set TMPSRC=..\..
 @if NOT EXIST %TMPSRC%\CMakeLists.txt goto NOCM
+@set DOPAUSE=1
 
 @if /I "%PROCESSOR_ARCHITECTURE%" EQU "AMD64" (
 @set TMPINST=%TMPROOT%\software.x64
@@ -32,7 +39,7 @@
 @REM call setupqt64
 @cd %BLDDIR%
 
-:DNARCH
+@REM :DNARCH
 
 @REM ############################################
 @REM NOTE: SPECIAL INSTALL LOCATION
@@ -40,19 +47,26 @@
 @REM ##########################################
 @REM set TMPINST=F:\Projects\software.x64
 @set TMPOPTS=-DCMAKE_INSTALL_PREFIX=%TMPINST%
-@set TMPOPTS=%TMPOPTS% -G "Visual Studio 10 Win64"
+@set TMPOPTS=%TMPOPTS% -G "%GENERATOR%"
 @REM set TMPOPTS=%TMPOPTS% -DTIDY_CONFIG_FILE="C:\MDOS\tidy5.cfg"
 @REM set TMPOPTS=%TMPOPTS% -DTIDY_USER_CONFIG_FILE="C:\MDOS\tidy5.cfg"
 @set TMPOPTS=%TMPOPTS% -DBUILD_SHARED_LIB:BOOL=OFF
 
 :RPT
 @if "%~1x" == "x" goto GOTCMD
-@set TMPOPTS=%TMPOPTS% %1
+@if "%~1x" == "NOPAUSEx" (
+    @set DOPAUSE=0
+) else (
+    @set TMPOPTS=%TMPOPTS% %1
+)
 @shift
 @goto RPT
 :GOTCMD
 
 @call chkmsvc %TMPPRJ%
+@call chkbranch %TMPBR%
+@if ERRORLEVEL 1 goto BADBR
+:GOTBR
 
 @echo Begin %DATE% %TIME%, output to %TMPLOG%
 @echo Begin %DATE% %TIME% >> %TMPLOG%
@@ -74,11 +88,20 @@
 :DNREL
 
 @echo Appears a successful build
-@echo.
-@REM echo No INSTALL configured at this time
-@REM goto END
-
 @echo Note install location %TMPINST%
+@echo.
+
+@REM ##############################################
+@REM Check if should continue with install
+@REM ##############################################
+@if "%DOPAUSE%x" == "0x" goto DOINST
+@choice /? >nul 2>&1
+@if ERRORLEVEL 1 goto NOCHOICE
+@choice /D N /T 10 /M "Pausing for 10 seconds. Def=N"
+@if ERRORLEVEL 2 goto GOTNO
+@goto DOINST
+:NOCHOICE
+@echo Appears OS does not have the 'choice' command!
 @ask *** CONTINUE with install? *** Only y continues
 @if ERRORLEVEL 2 goto NOASK
 @if ERRORLEVEL 1 goto DOINST
@@ -86,11 +109,15 @@
 @echo.
 @goto END
 :NOASK
-@echo ask not found in path...
-@echo *** CONTINUE with install? *** Only y continues
+@echo 'ask' utility not found in path...
+@echo.
+@echo *** CONTINUE with install? *** Only Ctrl+c aborts...
+@echo.
 @pause
 
 :DOINST
+@echo Proceeding with INSTALL...
+@echo.
 @REM cmake -P cmake_install.cmake
 @echo Doing: 'cmake --build . --config debug --target INSTALL'
 @echo Doing: 'cmake --build . --config debug --target INSTALL' >> %TMPLOG%
@@ -106,13 +133,19 @@
 
 @goto END
 
+:GOTNO
+@echo.
+@echo No install at this time, but there may be an updexe.bat to copy the EXE to c:\MDOS...
+@echo.
+@goto END
+
 :NOBAT
 @echo Can NOT locate MSVC setup batch "%SET_BAT%"! *** FIX ME ***
 @goto ISERR
 
-:NOROOT
-@echo Can NOT locate %TMPROOT%! *** FIX ME ***
-@goto ISERR
+@REM :NOROOT
+@REM @echo Can NOT locate %TMPROOT%! *** FIX ME ***
+@REM @goto ISERR
 
 :NOCM
 @echo Can NOT locate %TMPSRC%\CMakeLists.txt! *** FIX ME ***
@@ -147,6 +180,16 @@
 @cmake --build . --config release >> %TMPLOG% 2>&1
 @if ERRORLEVEL 1 goto ERR33
 @goto DNREL
+
+:BADBR
+@call git checkout %TMPBR%
+@call chkbranch %TMPBR%
+@if ERRORLEVEL 1 goto BADBR2
+@goto GOTBR
+:BADBR2
+@call shwbranch
+@echo Not on correct branch %TMPBR%
+@goto ISERR
 
 :ISERR
 @endlocal

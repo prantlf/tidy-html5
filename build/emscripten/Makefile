@@ -139,22 +139,20 @@ OBJFILES=\
         $(OBJDIR)/parser$(OBJSUF)     $(OBJDIR)/tags$(OBJSUF)       $(OBJDIR)/entities$(OBJSUF) \
         $(OBJDIR)/lexer$(OBJSUF)      $(OBJDIR)/pprint$(OBJSUF)     $(OBJDIR)/clean$(OBJSUF) \
         $(OBJDIR)/message$(OBJSUF)    $(OBJDIR)/config$(OBJSUF)     $(OBJDIR)/alloc$(OBJSUF) \
-        $(OBJDIR)/attrask$(OBJSUF)    $(OBJDIR)/attrdict$(OBJSUF)   $(OBJDIR)/attrget$(OBJSUF) \
+        $(OBJDIR)/messageobj$(OBJSUF) $(OBJDIR)/attrdict$(OBJSUF)   $(OBJDIR)/language$(OBJSUF) \
         $(OBJDIR)/buffio$(OBJSUF)     $(OBJDIR)/fileio$(OBJSUF)     $(OBJDIR)/streamio$(OBJSUF) \
         $(OBJDIR)/tagask$(OBJSUF)     $(OBJDIR)/tmbstr$(OBJSUF)     $(OBJDIR)/utf8$(OBJSUF) \
         $(OBJDIR)/tidylib$(OBJSUF)    $(OBJDIR)/mappedio$(OBJSUF)   $(OBJDIR)/gdoc$(OBJSUF) \
-        $(OBJDIR)/language$(OBJSUF)
 
 CFILES= \
         $(SRCDIR)/access.c       $(SRCDIR)/attrs.c        $(SRCDIR)/istack.c \
         $(SRCDIR)/parser.c       $(SRCDIR)/tags.c         $(SRCDIR)/entities.c \
         $(SRCDIR)/lexer.c        $(SRCDIR)/pprint.c       $(SRCDIR)/clean.c \
         $(SRCDIR)/message.c      $(SRCDIR)/config.c       $(SRCDIR)/alloc.c \
-        $(SRCDIR)/attrask.c      $(SRCDIR)/attrdict.c     $(SRCDIR)/attrget.c \
+        $(SRCDIR)/messageobj.c   $(SRCDIR)/attrdict.c     $(SRCDIR)/language.c \
         $(SRCDIR)/buffio.c       $(SRCDIR)/fileio.c       $(SRCDIR)/streamio.c \
         $(SRCDIR)/tagask.c       $(SRCDIR)/tmbstr.c       $(SRCDIR)/utf8.c \
         $(SRCDIR)/tidylib.c      $(SRCDIR)/mappedio.c     $(SRCDIR)/gdoc.c \
-        $(SRCDIR)/language.c
 
 HFILES= $(INCDIR)/tidyplatform.h $(INCDIR)/tidy.h         $(INCDIR)/tidyenum.h \
         $(INCDIR)/tidybuffio.h

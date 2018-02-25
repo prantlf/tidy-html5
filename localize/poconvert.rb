@@ -14,6 +14,7 @@ require 'erb'            # Needed for templating.
 require 'thor'           # thor provides robust command line parameter parsing.
 require 'i18n'           # Cross-platform access to `locale`.
 require 'digest'         # For computing checksums.
+require 'git'            # For working with old versions of files.
 
 
 ################################################################################
@@ -29,7 +30,7 @@ module PoConvertModule
   ###########################################################
   @@default_en = File.expand_path(File.join('..', 'src', 'language_en.h' ))
   @@header_template = File.expand_path(File.join('.', 'language_ll_cc.h.erb'))
-  @@header_digest = 'b597e5948de1611ab6cde11934df6fc792c7ec4d21f3cd2030fb2e9bcfb94991'
+  @@header_digest = '9e5c3bf0b02c20e6fe2068a8edc09de1bb091a14144b211f4c36b0f9d1ec5f97'
 
 
   ###########################################################
@@ -155,11 +156,7 @@ module PoConvertModule
 
     #########################################################
     # parse_po_section( content )
-    #  Parses a single PO section. Note that will will still
-    #  parse and accept ##BLAH## as #if groups; they just
-    #  won't be used. We'll get the information live from
-    #  the English header instead of trying to store meta-
-    #  data in the PO/POT.
+    #  Parses a single PO section.
     #########################################################
     def parse_po_section( content )
 
@@ -167,12 +164,12 @@ module PoConvertModule
       # if we want to capture more PO stuff in the future.
       map = [
           [ :START,    :COMMENT,   :SET_COMMENT,  :START    ],
-          [ :START,    :IFGROUP,   :SET_GROUP,    :START    ],
+          [ :START,    :FLAG,      :SET_FLAG,     :START    ],
           [ :START,    :NEW_ITEM,  :SET_INIT,     :CONTINUE ],
           [ :START,    :OTHER,     :NOOP,         :START    ],
           [ :START,    :EMPTY,     :NOOP,         :START    ],
           [ :CONTINUE, :COMMENT,   :ERROR,        nil       ],
-          [ :CONTINUE, :IFGROUP,   :ERROR,        nil       ],
+          [ :CONTINUE, :FLAG,      :ERROR,        nil       ],
           [ :CONTINUE, :NEW_ITEM,  :SET_FINAL,    :CONTINUE ],
           [ :CONTINUE, :EMPTY,     :SET_FINAL,    :START    ],
           [ :CONTINUE, :OTHER,     :ADD_TO,       :CONTINUE ],
@@ -180,7 +177,7 @@ module PoConvertModule
 
       current_label = nil
       current_comment = nil
-      current_if_group = nil
+      current_flag = nil
       current_cases = {}     # 'case' => string
       state = :START
       buffer = ''
@@ -193,7 +190,7 @@ module PoConvertModule
         input = :OTHER
         input = :EMPTY if line == "\n"
         input = :COMMENT if line.start_with?('#.')
-        input = :IFGROUP if line[/^#\..*##.*##/]
+        input = :FLAG if line.start_with?('#,')
         input = :NEW_ITEM if line.start_with?('msgctxt', 'msgid', 'msgstr')
 
         # Find our current state-input pair
@@ -222,8 +219,8 @@ module PoConvertModule
                 item = line[/^(.*?)\s/, 1]
               when :SET_COMMENT
                 current_comment = line.match(/#\.\s*(.*?)$/)[1]
-              when :SET_GROUP
-                current_if_group = line.match(/##(.*)##/)[1]
+              when :SET_FLAG
+                current_flag = line.match(/#\,\s*(.*?)$/)[1]
               when :ERROR
                 @@log.error "#{__method__}: Could NOT parse part of the PO file. Aborting!\n"
                 @@log.error "#{__method__}: Last known label was \"#{current_label}\".\n"
@@ -240,7 +237,7 @@ module PoConvertModule
 
       # We have some nice local vars but let's put these into a hash
       # just like PoHeader file uses:
-      # :keyword => { '#' => { :comment, :if_group, :case, :string } }
+      # :keyword => { '#' => { :comment, :fuzzy, :case, :string } }
       # We will also reject items that have no string value.
       result = {}
       if current_label
@@ -248,9 +245,11 @@ module PoConvertModule
         result[current_label] = {}
         current_cases.each do | key, value |
           unless value == ''
+            fuzzy = ( current_flag =~ /fuzzy/i ) != nil
             result[current_label][key] = {}
-            result[current_label][key][:comment] = current_comment
-            result[current_label][key][:if_group] = current_if_group
+            result[current_label][key][:comment] = fuzzy ? "(fuzzy) #{current_comment}" : current_comment
+            result[current_label][key][:fuzzy] = fuzzy
+            result[current_label][key][:if_group] = nil
             result[current_label][key][:case] = key
             result[current_label][key][:string] = value
           end
@@ -362,7 +361,8 @@ module PoConvertModule
         l_key = key.to_sym
         self.items[l_key] = {} unless items.has_key?(l_key)
         self.items[l_key][num_case] = {}
-        self.items[l_key][num_case][:comment] = comment
+        self.items[l_key][num_case][:comment] = comment ? comment.sub( /\(fuzzy\) /i, '') : nil
+        self.items[l_key][num_case][:fuzzy] = ( comment =~ /\(fuzzy\) /i ) != nil
         self.items[l_key][num_case][:case] = num_case
         self.items[l_key][num_case][:if_group] = nil
         # Reconstitute Hex Escapes
@@ -370,7 +370,7 @@ module PoConvertModule
           line.lstrip.gsub(/\\x(..)/) { |g| [$1.hex].pack('c*').force_encoding('UTF-8') }
         end
         # Eliminate C double-double-quotes.
-        tmp = tmp.join.gsub(/""/) { |g| }
+        tmp = tmp.join.gsub(/(?<!\\)""/) { |g| }
         self.items[l_key][num_case][:string] = tmp
       end
       if !self.items || self.items.empty?
@@ -386,7 +386,7 @@ module PoConvertModule
       content.scan(%r!^#if (.*?)#endif!m) do | found_block |
         found_block[0].scan(%r!^\s*\{(?:/\* .*? \*/)?\s*(.*?),\s*.*?,\s*.*?\s*\},?!m) do | item |
           self.items[item[0].to_sym].each_value do  | plural |
-            plural[:if_group] = found_block[0].lines[0].rstrip
+          plural[:if_group] = found_block[0].each_line("\n").to_a[0].rstrip
           end
         end
       end
@@ -408,15 +408,17 @@ module PoConvertModule
 
     attr_accessor :emacs_footer
     attr_accessor :plaintext
+    attr_accessor :force_comments
 
     #########################################################
     # initialize
     #########################################################
     def initialize
-      @po_locale = nil       # The locale to use to generate PO files.
-      @known_locales = {}    # The locales we know about.
-      @emacs_footer = false  # Indicates whether or not to add emacs instructions.
-      @plaintext = false     # Indicates whether or not we should stick to plaintext.
+      @po_locale = nil        # The locale to use to generate PO files.
+      @known_locales = {}     # The locales we know about.
+      @emacs_footer = false   # Indicates whether or not to add emacs instructions.
+      @plaintext = true       # Indicates whether or not we should stick to plaintext.
+      @force_comments = false # Force comments into non-English header files?
     end
 
 
@@ -535,7 +537,7 @@ module PoConvertModule
       if result
         @@log.info "#{__method__}: The header template was found at #{@@header_template}"
       else
-        @@log.error "#{__method__}: Cannot find the header teamplate file. Check the value of @@header_template in this script."
+        @@log.error "#{__method__}: Cannot find the header template file. Check the value of @@header_template in this script."
         return false
       end
 
@@ -568,11 +570,11 @@ module PoConvertModule
 
 
     #########################################################
-    # convert_to_po( source_file_h, base_file )
+    # convert_to_po( source_file_h, base_file, fuzzy_list )
     #  Perform the conversion for xgettext, msginit, and
     #  msgunfmt.
     #########################################################
-    def convert_to_po( source_file_h = nil, base_file = nil )
+    def convert_to_po( source_file_h = nil, base_file = nil, fuzzy_list = nil )
       return false unless english_header?
 
       # What we actually do depends on what was setup for us.
@@ -583,14 +585,16 @@ module PoConvertModule
       action = :msginit if source_file_h.nil? && po_locale
       action = :xgettext if source_file_h.nil? && po_locale.nil?
 
-      # Untranslated Items form the basis of all output. For convenience
-      # we can use some non-English strings as an "untranslated" string,
-      # e.g., to help translate regional formats.
+      # lang_en serves as the master reference for all output, especially
+      # comments and metadata.
       lang_en = PoHeaderFile.new(@@default_en)
       return false unless lang_en.source_file
 
+      # untranslated_items serves as the source for *untranslated* strings.
+      # This differs from lang_en in that we may overwrite some of the
+      # lang_en strings from the base_file, later. This can help when
+      # translating, e.g., regional formats.
       untranslated_items = lang_en.items.clone
-
       if base_file
         lang_base = PoHeaderFile.new(base_file)
         return false unless lang_base.source_file
@@ -598,12 +602,26 @@ module PoConvertModule
       end
 
       # We will use lang_source if we have a source_file_h, i.e., msgunfmt,
-      # as the source for translated strings.
+      # as the source for *translated* strings.
       if source_file_h
         lang_source = PoHeaderFile.new(source_file_h)
         return false unless lang_source.source_file
       else
         lang_source = nil
+      end
+
+
+      # If we were given a fuzzy_list and we have a source_file, then
+      # we have to mark appropriate items as fuzzy.
+      if fuzzy_list && fuzzy_list.count > 0 && lang_source
+        untranslated_items.each do |key, value|
+          if fuzzy_list.include?(key)
+            value.each_value do |v|
+              v[:fuzzy] = true
+            end
+          end
+
+        end
       end
 
       # The information in the PO header can come from a few different sources
@@ -665,9 +683,14 @@ msgstr ""
         if value['0'][:comment]
           value['0'][:comment].each_line { |line| report << "#. #{line.strip}\n"}
         end
-        if %w($u $s $d).any? { | find | value['0'][:string].include?(find) }
-          report << "#, c-format\n"
+
+        attribs = []
+        attribs << 'fuzzy' if value['0'][:fuzzy] && action == :msgunfmt
+        attribs << 'c-format' if %w(%u %s %d).any? { | find | value['0'][:string].include?(find) }
+        if attribs.count > 0
+          report << "#, #{attribs.join(', ')}\n"
         end
+
         report << "msgctxt \"#{key.to_s}\"\n"
 
         # Handle the untranslated strings, with the possibility that there
@@ -776,10 +799,13 @@ msgstr ""
       # Additionally we will only use comments from language_en.h. Besides
       #  preventing us from having to format them, we ensure that only the
       #  canonical comments are put into the H file in the event of changes.
+      # Additionally only include comments if enabled.
+      # Finally add fuzzy notes to comments if the PO item is fuzzy.
       po_content.items.each do |key, value|
         value.each_value do |item_entry|
           item_entry[:if_group] = lang_en.items[key]['0'][:if_group]
-          item_entry[:comment] = lang_en.items[key]['0'][:comment]
+          item_entry[:comment] = force_comments ? lang_en.items[key]['0'][:comment] : nil
+          item_entry[:comment] = "(fuzzy) #{item_entry[:comment]}" if item_entry[:fuzzy]
         end
       end
 
@@ -1083,6 +1109,10 @@ Complete Help:
            :type => :boolean,
            :desc => 'Specifies that the generated file contain hex escaped characters.',
            :aliases => '-h'
+    option :force_comments,
+           :type =>:boolean,
+           :desc => 'Forces comments into the header file. Base language_en.h always has comments.',
+           :aliases => '-f'
     desc 'msgfmt <input_file.po>', 'Creates a Tidy header H file from the given PO file.'
     long_desc <<-LONG_DESC
       Creates a Tidy header H file from the specified <input_file.po> PO file,
@@ -1104,6 +1134,7 @@ Complete Help:
       args.each do |input_file|
         converter = PoConverter.new
         converter.plaintext = !options[:hex]
+        converter.force_comments = options[:force_comments]
         set_options
         error_count = converter.convert_to_h( input_file, options[:baselang] ) ? error_count : error_count + 1
       end
@@ -1112,6 +1143,111 @@ Complete Help:
         puts 'msgfmt exited without errors.'
       else
         puts "msgfmt exited with errors #{error_count} time(s). Consider using the --verbose or --debug options."
+        exit 1
+      end
+    end # msgfmt
+
+
+    #########################################################
+    # rebase
+    #  See long_desc
+    #########################################################
+    option :sha,
+           :type =>:string,
+           :desc => 'Specify the hash against which to check for changed strings.',
+           :aliases => '-c'
+    desc 'rebase [--sha=HASH]', 'Creates fresh POT, POs, and headers after updates to language_en.h.'
+    long_desc <<-LONG_DESC
+      After changing strings in language_en.h, this command will generate a fresh POT
+      template, as well as regenerate POs for each language in src/. Finally, it will
+      regenerate the language header files for each of the new PO files. Items that
+      have changed in English will be appropriately marked as fuzzy in the PO files.
+
+      Source files will *not* be overwritten. All generated files will be placed into
+      the working directory. Please review them before committing them to source.
+
+      If you specify the SHA-1 checksum of the commit for comparison purposes, then
+      this command identifies fuzzy items by comparing language_en.h with a previous
+      version as identified by the SHA-1.
+
+      Use case: If you change language_en.h, this handy command updates everything
+      else nearly automatically.
+    LONG_DESC
+    def rebase()
+      error_count = 0
+      fuzzy_list = nil
+
+      pwd = File.expand_path( File.join(Dir.getwd, '..') )
+
+      if options[:sha]
+        sha = options[:sha]
+        temp_file = "~#{sha}.h"
+        project = Git.open(pwd)
+
+        # We'll get the old version of the file from the specified commit,
+        # and then write it to a temporary file. Then we can parse both
+        # this temporary file as well as the current version of the file
+        # and detect the differences.
+        File.open( temp_file, 'w') { |f| f.write( project.show(sha, File.join('src', 'language_en.h')) ) }
+        header_old = PoHeaderFile.new(temp_file)
+        header_new = PoHeaderFile.new(@@default_en)
+        File.delete( temp_file )
+
+
+        # Compare each item in the current version with the value, if any,
+        # in the previous version in order to build a list of fuzzy stuff.
+        fuzzy_list = []
+        header_new.items.each do |key, value|
+          value.each do |plural_key, plural_value|
+            new_value = plural_value[:string]
+            old_value = header_old.items.include?(key) ? header_old.items[key][plural_key][:string] : nil
+            unless old_value == new_value
+              fuzzy_list << key
+            end
+
+          end
+        end
+        fuzzy_list.uniq!
+      end
+
+
+      # We're ready to generate the POT, which requires nothing special.
+      converter = PoConverter.new
+      unless converter.convert_to_po( nil, nil)
+        error_count += 1
+        puts 'There was an issue generating the POT. Will continue anyway.'
+      end
+
+
+      # Build a list of header files. Keep this list instead of counting
+      # on reading the working directory later.
+      header_path = File.join(pwd, 'src', 'language_*.h')
+      header_list = nil
+      Dir.chdir(File.join(pwd, 'src')) do
+        header_list = Dir.glob('language_*.h')
+      end
+      header_list.delete('language_en.h')
+
+
+      # Building the POs is straight forward.
+      header_list.each do |input_file|
+        filename = File.join(pwd, 'src', input_file)
+        converter = PoConverter.new
+        error_count = converter.convert_to_po( filename, nil, fuzzy_list ) ? error_count : error_count + 1
+      end
+
+
+      # Building the Headers is straight forward, too.
+      header_list.each do |input_file|
+        filename = "#{File.basename(input_file, '.*')}.po"
+        converter = PoConverter.new
+        error_count = converter.convert_to_h( filename, nil ) ? error_count : error_count + 1
+      end
+
+      if error_count == 0
+        puts 'rebase exited without errors.'
+      else
+        puts "rebase exited with errors #{error_count} time(s). Consider using the --verbose or --debug options."
         exit 1
       end
     end # msgfmt
