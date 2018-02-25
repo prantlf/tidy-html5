@@ -21,7 +21,7 @@ The output module will be written to `bin/tidy.js` in the project root.
 You can use the module from Node.js:
 
 ```js
-const tidy = require('./tidy')
+const tidy = require('./bin/tidy')
 const result = tidy.tidy_html5('<html>...</html>')
 console.error('Errors:', result.errors.join('\n'))
 console.log('Output:', result.output)
