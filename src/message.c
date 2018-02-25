@@ -508,7 +508,7 @@ static struct _dispatchTable {
 ** even if the signature matches some unrelated report that you wish to
 ** generate.
 */
-TidyMessageImpl *formatAccessReport(TidyDocImpl* doc, Node *ARG_UNUSED(element), Node *node, uint code, uint level, va_list args)
+TidyMessageImpl *formatAccessReport(TidyDocImpl* doc, Node *ARG_UNUSED(element), Node *node, uint code, uint level, va_list ARG_UNUSED(args))
 {
     doc->badAccess |= BA_WAI;
 
@@ -527,7 +527,7 @@ TidyMessageImpl *formatAccessReport(TidyDocImpl* doc, Node *ARG_UNUSED(element),
 ** provides local variables that are used principally in the formats used for
 ** the attribute related reports.
 */
-TidyMessageImpl *formatAttributeReport(TidyDocImpl* doc, Node *element, Node *node, uint code, uint level, va_list ARG_UNUSED(args))
+TidyMessageImpl *formatAttributeReport(TidyDocImpl* doc, Node *ARG_UNUSED(element), Node *node, uint code, uint level, va_list ARG_UNUSED(args))
 {
     AttVal *av = NULL;
     char const *name = "NULL";

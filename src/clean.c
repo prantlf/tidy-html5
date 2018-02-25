@@ -1003,7 +1003,7 @@ static Bool Dir2Div( TidyDocImpl* doc, Node *node, Node **ARG_UNUSED(pnode))
     Action: replace <center> by <div style="text-align: center">
 */
 
-static Bool Center2Div( TidyDocImpl* doc, Node *node, Node **pnode)
+static Bool Center2Div( TidyDocImpl* doc, Node *node, Node **ARG_UNUSED(pnode) )
 {
     if ( nodeIsCENTER(node) )
     {
@@ -1359,7 +1359,7 @@ static Bool InlineElementToCSS( TidyDocImpl* doc, Node* node,
   the font element's attributes and replacing them
   by a single style attribute.
 */
-static Bool Font2Span( TidyDocImpl* doc, Node *node, Node **pnode )
+static Bool Font2Span( TidyDocImpl* doc, Node *node, Node **ARG_UNUSED(pnode) )
 {
     AttVal *av, *style, *next;
 

@@ -562,7 +562,7 @@ static Bool OptionValueIdentical( const TidyOptionImpl* option,
 }
 
 
-static Bool NeedReparseTagDecls( TidyDocImpl* doc,
+static Bool NeedReparseTagDecls( TidyDocImpl* ARG_UNUSED(doc),
                                  const TidyOptionValue* current,
                                  const TidyOptionValue* new,
                                  uint *changedUserTags )
